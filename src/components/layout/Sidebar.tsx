@@ -37,8 +37,8 @@ function SidebarNav({ pathname, onNavigate }: NavProps) {
           className={cn(
             'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors mb-1',
             pathname === '/'
-              ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100'
+              : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'
           )}
         >
           <Home className="h-4 w-4 shrink-0" />
@@ -55,7 +55,7 @@ function SidebarNav({ pathname, onNavigate }: NavProps) {
 
           return (
             <Collapsible key={cluster} defaultOpen>
-              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:bg-accent">
+              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100">
                 {CLUSTER_LABELS[cluster]}
                 <ChevronRight className="h-3 w-3 transition-transform [[data-state=open]_&]:rotate-90" />
               </CollapsibleTrigger>
@@ -74,8 +74,8 @@ function SidebarNav({ pathname, onNavigate }: NavProps) {
                           className={cn(
                             'flex items-center rounded-md px-3 py-2 text-sm transition-colors',
                             isActive
-                              ? 'bg-accent font-medium text-accent-foreground'
-                              : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                              ? 'bg-zinc-100 dark:bg-zinc-800 font-medium text-zinc-900 dark:text-zinc-100'
+                              : 'text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'
                           )}
                         >
                           <span className="mr-2 text-xs text-muted-foreground/60">

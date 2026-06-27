@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git Policy
+
+**Never commit code yourself.** Always provide the commit title and message and let the user commit manually.
+
+---
+
 ## Project Purpose
 
 An open-source, interactive system design learning platform that teaches FAANG-tier distributed systems concepts visually — through live code, production-grade schemas, Mermaid.js diagrams, Framer Motion animations, and interview prep. Built with Next.js, Node.js, Express.js, and MongoDB.
