@@ -370,21 +370,39 @@ jobs:
 
 ## Phase 01 Completion Checklist
 
-- [ ] `npx create-next-app` complete, TypeScript strict enabled
-- [ ] All dependencies installed and resolving
-- [ ] `next.config.ts` MDX pipeline configured (Shiki + rehype-mermaid)
-- [ ] Directory structure created as specified
-- [ ] Zustand store working — sidebar and animation state persisted to localStorage
-- [ ] `useReducedMotion` hook wired to both system preference and manual toggle
-- [ ] `next-themes` dark/light mode working with system default
-- [ ] Tailwind colour tokens added
-- [ ] Navbar shell rendered with all 4 controls
-- [ ] Sidebar shell rendered, collapsed on mobile, open on desktop
-- [ ] `Topic` TypeScript type defined
-- [ ] GitHub Actions CI running on push to main
-- [ ] Vercel project connected and deploying to `interactivesystemdesign.vercel.app`
-- [ ] App renders without errors at 390px, 768px, 1280px viewports
-- [ ] `npm run lint` and `npx tsc --noEmit` both pass clean
+- [x] `npx create-next-app` complete, TypeScript strict enabled (`strict`, `noUncheckedIndexedAccess`)
+- [x] All dependencies installed — framer-motion, next-themes, zustand, lucide-react, clsx, tailwind-merge, class-variance-authority, @shikijs/rehype, rehype-mermaid, @next/mdx and remark plugins
+- [x] `next.config.ts` configured with `turbopack.root` and `pageExtensions` — MDX pipeline deferred to Phase 02 (see note below)
+- [x] Directory structure created — `src/app`, `src/components/layout`, `src/components/ui`, `src/components/animations`, `src/components/mdx`, `src/lib/hooks`, `src/store`, `src/types`, `src/content/topics`
+- [x] Zustand store (`src/store/uiStore.ts`) — sidebar open/close and animation pause state persisted to localStorage
+- [x] `useReducedMotion` hook (`src/lib/hooks/useReducedMotion.ts`) — combines OS `prefers-reduced-motion` with manual Zustand pause state
+- [x] `next-themes` dark/light mode wired in root layout — system default, `suppressHydrationWarning` set
+- [x] Animation colour tokens added to `globals.css` as CSS variables (`--anim-success`, `--anim-error`, `--anim-pending`, `--anim-data`, `--anim-idle`)
+- [x] Navbar shell (`src/components/layout/Navbar.tsx`) — logo, sidebar toggle, animation pause toggle, theme toggle; all controls meet 44×44px tap target
+- [x] Sidebar shell (`src/components/layout/Sidebar.tsx`) — cluster-grouped navigation, active topic highlighted, collapsible per cluster
+- [x] `Topic` TypeScript type defined (`src/types/topic.ts`) — all 6 tag fields typed
+- [x] Topic registry (`src/lib/topics.ts`) — all 14 MVP topics with full tag data, `getTopicBySlug` and `getTopicsByPath` helpers
+- [x] Homepage (`src/app/page.tsx`) — topic grid grouped by cluster with difficulty colour coding
+- [x] Dynamic topic pages (`src/app/topics/[slug]/page.tsx`) — all 14 slugs statically generated, prerequisites block with links
+- [x] shadcn/ui components installed — button, dropdown-menu, sheet, scroll-area, collapsible
+- [x] GitHub Actions CI (`.github/workflows/ci.yml`) — lint + typecheck on push to main and PRs
+- [x] `npm run lint` passes clean
+- [x] `npx tsc --noEmit` passes clean — zero errors
+- [x] `npm run build` passes — 18 static routes generated successfully
+- [x] Home icon added to Navbar (dedicated icon button) and Sidebar nav (top link above clusters) — both link to `/`
+- [x] Brand name in Navbar made a clickable link to `/`
+- [x] Mobile sidebar drawer implemented — hamburger toggle opens a `Sheet` (slide-in from left) on viewports below `lg` (1024px); desktop inline sidebar unchanged
+- [x] Animation pause/play toggle hidden when the current page has no animations — `pageHasAnimations` flag in Zustand store (not persisted); animation components call `setPageHasAnimations(true)` on mount
+- [ ] Vercel project connected and deploying to `interactivesystemdesign.vercel.app` *(manual step — push to GitHub then connect via vercel.com/new)*
+- [ ] App verified at 390px, 768px, 1280px viewports *(run `npm run dev` and test in browser DevTools)*
+
+### Deferred to Phase 02
+
+| Item | Reason |
+|---|---|
+| `rehype-mermaid` in MDX pipeline | Requires `playwright` (headless browser) — no MDX content files exist yet in Phase 01 |
+| Full MDX pipeline in `next.config.ts` | Turbopack (Next.js 16 default) does not serialize function-based remark/rehype plugins — Phase 02 will resolve with Turbopack-compatible MDX config |
+| `exactOptionalPropertyTypes` in tsconfig | Incompatible with shadcn/ui generated components — removed, `strict` + `noUncheckedIndexedAccess` remain |
 
 ---
 
