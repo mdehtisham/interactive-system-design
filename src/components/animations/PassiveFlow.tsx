@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useTheme } from 'next-themes'
 import { motion } from 'framer-motion'
 import { AnimationShell } from './AnimationShell'
 import { cn } from '@/lib/utils'
@@ -25,9 +27,9 @@ interface Props {
 type NodeState = 'idle' | 'active' | 'done'
 
 const NODE_COLOUR_CLASSES: Record<NodeState, string> = {
-  idle:   'border-border bg-muted text-muted-foreground',
-  active: 'border-[var(--anim-data)] bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 shadow-md shadow-blue-200/50 dark:shadow-blue-900/30',
-  done:   'border-[var(--anim-success)] bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300',
+  idle:   'border-border bg-transparent text-muted-foreground',
+  active: 'border-[var(--anim-data)] bg-transparent text-blue-700 dark:text-blue-300 shadow-md shadow-blue-200/50 dark:shadow-blue-900/30',
+  done:   'border-[var(--anim-success)] bg-transparent text-green-700 dark:text-green-300',
 }
 
 const CONNECTOR_COLOUR_CLASSES: Record<'active' | 'idle', string> = {
@@ -43,43 +45,85 @@ interface NodeBoxProps {
 }
 
 function NodeBox({ node, state }: NodeBoxProps) {
+  const { resolvedTheme } = useTheme()
   const [showTooltip, setShowTooltip] = useState(false)
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0 })
+  const nodeRef = useRef<HTMLDivElement>(null)
+
+  const isDark = resolvedTheme === 'dark'
+  const bg     = isDark ? '#18181b' : '#ffffff'
+  const color  = isDark ? '#f4f4f5' : '#111111'
+  const border = isDark ? '#3f3f46' : '#e5e7eb'
+
+  const openTooltip = useCallback(() => {
+    if (nodeRef.current) {
+      const rect = nodeRef.current.getBoundingClientRect()
+      // Place tooltip above the node: bottom of tooltip = top of node - 12px gap
+      setTooltipPos({ top: rect.top - 12, left: rect.left + rect.width / 2 })
+    }
+    setShowTooltip(true)
+  }, [])
+
+  const closeTooltip = useCallback(() => setShowTooltip(false), [])
 
   return (
-    <div className="relative flex flex-col items-center">
+    <div className="flex flex-col items-center">
       <motion.div
-        animate={{
-          scale: state === 'active' ? [1, 1.06, 1] : 1,
-        }}
-        transition={{
-          duration: 0.4,
-          ease: 'easeInOut',
-        }}
+        ref={nodeRef}
+        animate={{ scale: state === 'active' ? [1, 1.06, 1] : 1 }}
+        transition={{ duration: 0.4, ease: 'easeInOut' }}
         className={cn(
           'flex min-h-[52px] w-[100px] cursor-pointer items-center justify-center rounded-lg border-2 px-2 py-2 text-center text-xs font-medium transition-colors duration-300',
           NODE_COLOUR_CLASSES[state]
         )}
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
-        onTouchStart={() => setShowTooltip(true)}
-        onTouchEnd={() => setShowTooltip(false)}
+        onMouseEnter={openTooltip}
+        onMouseLeave={closeTooltip}
+        onTouchStart={openTooltip}
+        onTouchEnd={closeTooltip}
         role="listitem"
         aria-label={`${node.label}: ${node.tooltip}`}
       >
         {node.label}
       </motion.div>
 
-      {/* Tooltip — appears above the node */}
-      {showTooltip && (
+      {showTooltip && createPortal(
         <motion.div
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
-          className="absolute bottom-full mb-2 z-20 w-52 rounded-lg border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-lg"
           role="tooltip"
+          style={{
+            position: 'fixed',
+            top: tooltipPos.top,
+            left: tooltipPos.left,
+            transform: 'translate(-50%, -100%)',
+            zIndex: 9999,
+            backgroundColor: bg,
+            color,
+            border: `1px solid ${border}`,
+            borderRadius: '8px',
+            padding: '8px 12px',
+            fontSize: '12px',
+            lineHeight: '1.5',
+            width: '208px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            pointerEvents: 'none',
+          }}
         >
           {node.tooltip}
-          <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-border" />
-        </motion.div>
+          {/* Arrow pointing down toward the node */}
+          <div style={{
+            position: 'absolute',
+            left: '50%',
+            top: '100%',
+            transform: 'translateX(-50%)',
+            width: 0,
+            height: 0,
+            borderLeft: '6px solid transparent',
+            borderRight: '6px solid transparent',
+            borderTop: `6px solid ${border}`,
+          }} />
+        </motion.div>,
+        document.body
       )}
     </div>
   )

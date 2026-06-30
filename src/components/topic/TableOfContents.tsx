@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
  *
  * Heading text → slugified ID:
  *   "ELI5 Foundation"  → "eli5-foundation"
- *   "FAANG Deep-Dive"  → "faang-deep-dive"
+ *   "Big Tech Deep-Dive" → "big-tech-deep-dive"
  *   "Implementation"   → "implementation"
  *   "Schema"           → "schema"
  *   "Animations"       → "animations"
@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
  */
 const SECTIONS = [
   { id: 'eli5-foundation',  label: 'ELI5 Foundation' },
-  { id: 'faang-deep-dive',  label: 'FAANG Deep-Dive' },
+  { id: 'big-tech-deep-dive',  label: 'Big Tech Deep-Dive' },
   { id: 'implementation',   label: 'Implementation' },
   { id: 'schema',           label: 'DB & API Schema' },
   { id: 'animations',       label: 'Animations' },
@@ -103,8 +103,8 @@ export function TableOfContents() {
                 className={cn(
                   '-ml-px flex cursor-pointer select-none items-center border-l-2 py-1.5 pl-3 text-sm transition-all duration-150',
                   isActive
-                    ? 'border-primary font-medium text-foreground'
-                    : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-100'
+                    ? 'border-blue-600 font-medium text-blue-700 dark:border-blue-400 dark:text-blue-400'
+                    : 'border-transparent text-zinc-500 dark:text-zinc-400 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-gray-50 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100'
                 )}
               >
                 {section.label}

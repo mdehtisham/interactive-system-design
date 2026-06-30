@@ -10,28 +10,214 @@ prerequisites: []
 
 ## ELI5 Foundation
 
-_Full content coming in Phase 03._
+Imagine you want to borrow a book from a giant library. But the library is so big it has millions of shelves, and you don't know which shelf your book is on. So you first walk to the front desk and say "I want the book called *google.com*." The librarian looks it up in a card catalogue and tells you: "That book is on shelf 142.250.80.49."
 
-## FAANG Deep-Dive
+Now you know where to go. You walk to that shelf (this is called making a **TCP connection**), the librarian confirms you arrived safely (a short back-and-forth called a **handshake**), and then you finally ask for the book. The librarian hands it to you. That ask-and-answer is the **HTTP request and response**.
 
-_Full content coming in Phase 03._
+The card catalogue is called **DNS** — the Domain Name System. Your browser uses it to turn a human-friendly name like *google.com* into a numeric address (an **IP address**) that computers use to find each other. Without DNS, you'd have to memorise numbers like 142.250.80.49 for every site you visit.
+
+---
+
+## Big Tech Deep-Dive
+
+At the scale of Google, Netflix, or Cloudflare, DNS is far more than a phonebook — it is a routing layer, a load balancer, and a failover mechanism.
+
+### The DNS Hierarchy
+
+Every DNS lookup walks a chain of four servers:
+
+1. **Recursive resolver** — your ISP's server or a public resolver (Google's `8.8.8.8`, Cloudflare's `1.1.1.1`). It performs the lookup on your behalf.
+2. **Root nameserver** — 13 clusters worldwide (operated by ICANN, Verisign, NASA, and others). They don't know your IP; they know who to ask next.
+3. **TLD nameserver** — one per top-level domain (Verisign runs `.com`). They know which authoritative nameserver handles your domain.
+4. **Authoritative nameserver** — your registrar's server (AWS Route 53, Cloudflare DNS). It has the actual DNS records and returns the IP.
+
+The full chain — recursive resolver → root → TLD → authoritative — costs 4 round trips and typically takes 300–500ms on a cold cache. Most lookups never reach root because the recursive resolver caches results.
+
+### TTL: The Expiry on Every DNS Record
+
+Every DNS record carries a **TTL** (Time to Live) — a number in seconds after which the cached record must be discarded and re-fetched. Netflix sets TTLs of 20–60 seconds on critical services, trading higher DNS query volume for faster failover. A 60-second TTL means that if a data centre fails, every resolver in the world will have the new record within 60 seconds. An 86400-second TTL (24 hours) means a sudden DC failure could leave users routing to a dead server for up to a day.
+
+> **Operational rule:** Lower the TTL *before* a planned migration — not during. If your TTL was 86400s and your DC just caught fire, you are stuck waiting for resolvers to expire their cache.
+
+### GeoDNS: Routing by Geography
+
+Netflix uses AWS Route 53's **GeoDNS** capability to return a different IP address depending on where the DNS query originates. A user in London gets routed to Netflix's nearest AWS EU region; a user in Tokyo gets APAC. This alone reduces streaming latency from ~200ms to ~20ms — a 10× improvement — without the user doing anything differently.
+
+Google operates its own global DNS resolver (`8.8.8.8`) using **anycast routing**: the same IP address is announced from hundreds of Points of Presence (PoPs) worldwide. Your query reaches the nearest PoP automatically, without any explicit routing decision.
+
+Cloudflare's `1.1.1.1` resolver handles roughly **1 trillion DNS queries per day** across 300+ PoPs. At that scale, even microsecond-level optimisations in DNS response time compound into billions of saved seconds.
+
+### TCP vs UDP for DNS
+
+Most DNS queries use **UDP** (connectionless, stateless, 1 packet) because the overhead of a TCP handshake would double query latency. DNS responses over 512 bytes fall back to TCP automatically — this happens with DNSSEC-signed responses, which include cryptographic signatures that expand record size.
+
+### Trade-offs
+
+| | Low TTL (60s) | High TTL (86400s) |
+|---|---|---|
+| Failover speed | Seconds | Up to 24 hours |
+| DNS query volume | High | Low |
+| Cache hit rate | Low | High |
+| Migration flexibility | High | Low |
+| Best for | Critical services, CDN origins | Static content, rarely-changed records |
+
+---
 
 ## Implementation
 
-_Full content coming in Phase 03._
+The best way to make HTTP concrete is to see what a server actually receives when you make a request. Here is a Next.js App Router API route that reflects every HTTP detail back to the caller — method, URL, real client IP, headers, and timestamp.
+
+```ts
+// src/app/api/request-echo/route.ts
+import { type NextRequest, NextResponse } from 'next/server'
+
+export async function GET(req: NextRequest) {
+  // x-forwarded-for carries the real client IP when behind a proxy or CDN.
+  // req.ip alone returns the proxy's IP, not the browser's.
+  const forwarded = req.headers.get('x-forwarded-for')
+  const ip = forwarded?.split(',')[0]?.trim() ?? 'unknown'
+
+  return NextResponse.json({
+    method:    req.method,
+    url:       req.url,
+    ip,
+    host:      req.headers.get('host'),
+    userAgent: req.headers.get('user-agent'),
+    headers:   Object.fromEntries(req.headers.entries()),
+    timestamp: new Date().toISOString(),
+  })
+}
+```
+
+Call it from your terminal to see a real HTTP request from your machine:
+
+```bash
+curl http://localhost:3000/api/request-echo | jq
+```
+
+Example response — every field is the actual HTTP request your browser or `curl` sent:
+
+```json
+{
+  "method": "GET",
+  "url": "http://localhost:3000/api/request-echo",
+  "ip": "::1",
+  "host": "localhost:3000",
+  "userAgent": "curl/8.4.0",
+  "headers": {
+    "host": "localhost:3000",
+    "user-agent": "curl/8.4.0",
+    "accept": "*/*"
+  },
+  "timestamp": "2025-01-15T10:30:00.000Z"
+}
+```
+
+**Why `x-forwarded-for` matters:** When your server sits behind a load balancer or CDN (Cloudflare, AWS ALB, Vercel), the `req.ip` value is the proxy's IP — the actual client IP is in the `x-forwarded-for` header. Always read this header for rate limiting, geo-detection, or audit logging. Validate and sanitize it — it is user-supplied and can be spoofed.
+
+---
 
 ## Schema
 
-_Full content coming in Phase 03._
+DNS does not have a traditional database schema, but its record types map directly to one. Each DNS record is a row with a type, a name, a value, and an expiry.
+
+<DnsErDiagram />
+
+The full DNS resolution path from browser to IP, step by step:
+
+<DnsResolutionDiagram />
+
+The full request lifecycle from URL typed to pixels on screen:
+
+<WebRequestLifecycle />
+
+---
 
 ## Animations
 
-_Animations coming in Phase 03._
+### Animation 1 — DNS Resolution Pipeline
+
+Watch a DNS query travel step-by-step from your browser to the authoritative nameserver. Each node lights up as the query arrives. Hover or tap any node to see its role explained.
+
+<DnsResolutionFlow />
+
+### Animation 2 — HTTP Request-Response Cycle
+
+Step through every phase of loading a webpage — from DNS lookup to browser paint. Each step shows what is happening at the network level and why it costs time.
+
+<HttpCycleSteps />
+
+### Animation 3 — GeoDNS Routing
+
+Select your location to see which data centre GeoDNS routes you to, and the estimated latency. Adjust the TTL slider to see how it affects failover speed when a data centre goes down.
+
+<GeoDnsInteractive />
+
+### Animation 4 — DNS Failure Modes
+
+The left panel always shows the happy path. The right panel shows what goes wrong — select a failure mode to see where the chain breaks and why.
+
+<DnsFailureModes />
+
+---
 
 ## Common Mistakes
 
-_Full content coming in Phase 03._
+1. **Treating DNS as instant.** A cold DNS lookup with no cache hits can take 300–500ms — four round trips at 50–100ms each. This is often the biggest contributor to first-load latency. Always profile DNS separately from TTFB. Use a CDN or a fast recursive resolver to minimise this.
+
+2. **Changing DNS during an incident.** If your TTL was 86400s before the outage, changing the DNS record now does not help for up to 24 hours — resolvers will keep returning the cached (broken) IP. The fix is to lower the TTL proactively, before migrations or during routine maintenance windows.
+
+3. **Conflating HTTP and TCP.** HTTP runs *over* TCP. TCP handles reliable, ordered delivery — retransmitting lost packets, ensuring bytes arrive in sequence. HTTP uses TCP as a transport and adds application-level semantics: methods (GET, POST), status codes (200, 404), and headers. They are separate layers; fixing a TCP issue (connection reset) is different from fixing an HTTP issue (wrong status code).
+
+4. **Trusting `req.ip` behind a proxy.** Behind a load balancer, CDN, or Kubernetes ingress, `req.ip` is the proxy's internal IP. The real client IP is in `x-forwarded-for` or `cf-connecting-ip` (Cloudflare-specific). Always read the right header, validate it is present, and be aware it can be spoofed by a client — never use it for security-critical decisions without additional validation.
+
+5. **Ignoring the cost of new TCP connections.** Every new TCP connection costs 1.5 round trips before a single byte of application data is sent (1 RTT for the handshake, then the first request). HTTP/2 keeps one connection open and multiplexes multiple requests over it. HTTP/3 (QUIC) eliminates the TCP handshake entirely. In a latency-sensitive system, minimising new connections is as important as minimising payload size.
+
+---
 
 ## Interview Prep
 
-_Full content coming in Phase 03._
+### Sample Big-tech Question
+
+> "Walk me through what happens when a user types `google.com` into their browser and hits Enter."
+
+### Structured Answer
+
+**1. DNS Resolution** *(15 seconds)*
+
+"The browser first resolves `google.com` to an IP address. It checks its local cache, then the OS cache. On a cache miss, it sends a query to the configured recursive resolver — usually 8.8.8.8 or the ISP's resolver. The resolver walks the DNS hierarchy: root nameserver → TLD nameserver → Google's authoritative nameserver. The authoritative NS returns Google's IP. The full chain takes 300–500ms cold; less than 1ms from cache."
+
+**2. TCP + TLS Handshake** *(15 seconds)*
+
+"With the IP in hand, the browser opens a TCP connection — three-way handshake: SYN, SYN-ACK, ACK. That costs 1 RTT. For HTTPS, a TLS handshake follows. TLS 1.3 adds 1 more RTT; TLS 1.2 adds 2. So we're at 2–3 RTTs before a single byte of HTTP is exchanged."
+
+**3. HTTP Request and Response** *(15 seconds)*
+
+"The browser sends `GET / HTTP/2` with headers: User-Agent, Accept-Encoding, cookies. Google's load balancer receives it and routes to an application server. The server returns `200 OK` with the HTML body. TTFB — Time to First Byte — is measured when the first response byte arrives. Google targets under 200ms TTFB."
+
+**4. Browser Render** *(10 seconds)*
+
+"The browser parses HTML and builds the DOM. It discovers linked CSS and JS, fetches them in parallel over the existing HTTP/2 connection, applies styles, and paints. The Critical Rendering Path — everything from first byte to first paint — is where Core Web Vitals (LCP, FID, CLS) are measured."
+
+### Back-of-the-Envelope
+
+| Metric | Value | Notes |
+|---|---|---|
+| DNS cold resolution | 300–500ms | 4 round trips at ~50–100ms each |
+| DNS cached (OS) | < 1ms | Memory lookup, no network |
+| DNS cached (resolver) | ~10–30ms | One hop to the resolver |
+| TCP handshake | 1 RTT ≈ 10–200ms | Depends on distance to server |
+| TLS 1.3 handshake | 1 RTT ≈ 10–200ms | Additional to TCP |
+| TLS 1.2 handshake | 2 RTT ≈ 20–400ms | One extra round trip vs 1.3 |
+| HTTP TTFB | 1 RTT + server processing | Server-side goal: < 50ms |
+| **Total (cold, same continent)** | **~500ms–1s** | First load, nothing cached |
+| **Total (warm, CDN edge hit)** | **~50–200ms** | Cached DNS + edge server |
+
+### Follow-up Questions to Expect
+
+- *"What is anycast routing and how does Google use it for 8.8.8.8?"*
+- *"Why does DNS use UDP instead of TCP for most queries?"*
+- *"What is DNSSEC and what problem does it solve?"*
+- *"What is the difference between HTTP/1.1, HTTP/2, and HTTP/3?"*
+- *"How does a CDN reduce TTFB, and what happens on a cache miss?"*
+- *"If you were designing a high-availability service, what TTL would you set and why?"*

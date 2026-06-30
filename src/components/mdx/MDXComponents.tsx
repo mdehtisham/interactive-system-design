@@ -5,11 +5,21 @@ import { PassiveFlow } from '@/components/animations/PassiveFlow'
 import { StepThrough } from '@/components/animations/StepThrough'
 import { Interactive } from '@/components/animations/Interactive'
 import { Comparative } from '@/components/animations/Comparative'
+// Topic-specific animation wrappers — one file per topic
+import { DnsResolutionFlow } from '@/components/animations/topics/DnsResolutionFlow'
+import { HttpCycleSteps } from '@/components/animations/topics/HttpCycleSteps'
+import { GeoDnsInteractive } from '@/components/animations/topics/GeoDnsInteractive'
+import { DnsFailureModes } from '@/components/animations/topics/DnsFailureModes'
+// Topic-specific diagram wrappers — chart strings live in TypeScript, not MDX,
+// so MDX's JSX parser never encounters the `{` characters in erDiagram blocks.
+import { DnsErDiagram } from '@/components/diagrams/DnsErDiagram'
+import { DnsResolutionDiagram } from '@/components/diagrams/DnsResolutionDiagram'
+import { WebRequestLifecycle } from '@/components/diagrams/WebRequestLifecycle'
 
 /**
  * Converts any string to a URL-safe anchor ID.
  * Used on headings so TableOfContents anchor links work.
- * e.g. "FAANG Deep-Dive" → "faang-deep-dive"
+ * e.g. "Big Tech Deep-Dive" → "big-tech-deep-dive"
  */
 function slugify(text: string): string {
   return text
@@ -53,7 +63,7 @@ export const mdxComponents: MDXComponents = {
     return (
       <h1
         id={headingId}
-        className="mt-10 scroll-mt-20 text-3xl font-bold tracking-tight first:mt-0"
+        className="mt-10 scroll-mt-20 text-3xl font-bold tracking-tight text-foreground first:mt-0"
         {...props}
       >
         {children}
@@ -66,7 +76,7 @@ export const mdxComponents: MDXComponents = {
     return (
       <h2
         id={headingId}
-        className="mt-10 scroll-mt-20 text-2xl font-semibold tracking-tight border-b border-border pb-2"
+        className="mt-10 scroll-mt-20 text-2xl font-semibold tracking-tight text-foreground border-b border-border pb-2"
         {...props}
       >
         {children}
@@ -79,7 +89,7 @@ export const mdxComponents: MDXComponents = {
     return (
       <h3
         id={headingId}
-        className="mt-8 scroll-mt-20 text-xl font-semibold"
+        className="mt-8 scroll-mt-20 text-xl font-semibold text-foreground"
         {...props}
       >
         {children}
@@ -89,7 +99,7 @@ export const mdxComponents: MDXComponents = {
 
   h4: ({ children, ...props }) => (
     <h4
-      className="mt-6 text-base font-semibold"
+      className="mt-6 text-base font-semibold text-foreground"
       {...props}
     >
       {children}
@@ -125,7 +135,7 @@ export const mdxComponents: MDXComponents = {
   // Tables — wrapped in an overflow scroll container to prevent page overflow.
   table: ({ children, ...props }) => (
     <div className="my-6 overflow-x-auto rounded-lg border border-border">
-      <table className="min-w-full text-sm" {...props}>
+      <table className="min-w-full text-sm !mt-0 !mb-0" {...props}>
         {children}
       </table>
     </div>
@@ -133,7 +143,8 @@ export const mdxComponents: MDXComponents = {
 
   th: ({ children, ...props }) => (
     <th
-      className="bg-muted px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+      className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider"
+      style={{ backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}
       {...props}
     >
       {children}
@@ -142,7 +153,7 @@ export const mdxComponents: MDXComponents = {
 
   td: ({ children, ...props }) => (
     <td
-      className="border-t border-border px-4 py-2.5 text-sm"
+      className="border-t border-border px-4 py-2.5 text-sm text-foreground"
       {...props}
     >
       {children}
@@ -150,13 +161,24 @@ export const mdxComponents: MDXComponents = {
   ),
 
   // Horizontal rule — used as a section divider.
-  hr: () => <hr className="my-8 border-border" />,
+  hr: () => <hr className="my-6 border-border" />,
 
-  // ── Animation and diagram components available in all topic MDX files ──────
-  // Usage in MDX: <Mermaid chart={`flowchart LR\n  A --> B`} caption="..." />
+  // ── Generic animation primitives ─────────────────────────────────────────
+  // Usage: <Mermaid chart={`flowchart LR\n  A --> B`} caption="..." />
   Mermaid: MermaidDiagram,
   PassiveFlow,
   StepThrough,
   Interactive,
   Comparative,
+
+  // ── Topic 01: How the Web Works — animations ────────────────────────────
+  DnsResolutionFlow,
+  HttpCycleSteps,
+  GeoDnsInteractive,
+  DnsFailureModes,
+
+  // ── Topic 01: How the Web Works — diagrams ───────────────────────────────
+  DnsErDiagram,
+  DnsResolutionDiagram,
+  WebRequestLifecycle,
 }

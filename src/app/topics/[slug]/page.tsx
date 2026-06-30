@@ -98,8 +98,11 @@ This topic is planned for a future release. Check back later.
         {/* Main MDX content */}
         <article className="min-w-0 flex-1 prose prose-neutral dark:prose-invert max-w-none
           prose-headings:scroll-mt-20
+          prose-p:text-foreground prose-li:text-foreground prose-td:text-foreground
+          prose-strong:text-foreground
           prose-a:text-primary prose-a:underline prose-a:underline-offset-4
-          prose-code:before:content-none prose-code:after:content-none">
+          prose-code:before:content-none prose-code:after:content-none
+          prose-li:my-1 prose-ol:my-3 prose-ul:my-3">
           <MDXRemote
             source={source}
             components={mdxComponents}

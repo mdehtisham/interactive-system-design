@@ -25,7 +25,7 @@ export default function HomePage() {
           Interactive System Design
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Learn FAANG-tier distributed systems from the ground up — with live code, animations, and interview prep.
+          Learn Big-tech-tier distributed systems from the ground up — with live code, animations, and interview prep.
         </p>
       </div>
 

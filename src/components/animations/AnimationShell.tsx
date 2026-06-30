@@ -64,7 +64,7 @@ export function AnimationShell({
   }, [])
 
   return (
-    <div className="my-6 overflow-hidden rounded-xl border border-border bg-card">
+    <div className="my-6 rounded-xl border border-border bg-card">
       {/* Header — title and description only, no controls here */}
       <div className="border-b border-border px-4 py-3">
         <p className="text-sm font-semibold leading-tight">{title}</p>
@@ -75,7 +75,7 @@ export function AnimationShell({
 
       {/* Animation canvas */}
       <div
-        className="relative overflow-hidden p-4"
+        className="relative overflow-x-hidden p-4"
         style={{ minHeight }}
       >
         {/* Reduced-motion / paused overlay */}
@@ -106,8 +106,8 @@ export function AnimationShell({
               className={cn(
                 'min-h-9 min-w-[52px] rounded-md px-2 text-xs font-medium capitalize transition-colors',
                 speed === s
-                  ? 'bg-accent text-accent-foreground shadow-sm'
-                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                  ? 'bg-gray-100 text-gray-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-100'
+                  : 'text-muted-foreground hover:bg-gray-50 dark:hover:bg-zinc-700/50 hover:text-gray-900 dark:hover:text-zinc-100'
               )}
             >
               {s}

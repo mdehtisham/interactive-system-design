@@ -8,6 +8,47 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## Known Issues — Never Repeat
+
+All confirmed bugs and their fixes are tracked in `issues_and_fixes.md` at the
+project root. Every rule below was learned the hard way — violating them will
+reproduce the exact same bugs in new components.
+
+### Colors
+
+- **Never** use `bg-accent` or `hover:bg-accent` for interactive states —
+  `--accent` resolves to near-white in the default shadcn neutral light theme
+  and produces invisible feedback. Use explicit Tailwind palette classes instead:
+  `bg-blue-50 text-blue-700` (active), `hover:bg-gray-50` (hover).
+- Badge/tag styles must follow `bg-*-100 text-*-900` (light) /
+  `bg-*-500/10 text-*-400` (dark). Never use ring-based badges.
+- Always add `prose-p:text-foreground prose-li:text-foreground prose-td:text-foreground`
+  to every `<article>` that renders MDX prose — the v4 typography plugin does
+  not inherit `--foreground` automatically.
+
+### Mermaid Diagrams
+
+- **Never** set `containerRef.current.innerHTML = svg` directly when React
+  manages children of that node. This causes a `removeChild` NotFoundError.
+  Always use `dangerouslySetInnerHTML` on a dedicated node that is in an
+  exclusive conditional branch (not a sibling of a React-managed loading state).
+- **Never** pass Mermaid chart strings as inline props in MDX files when the
+  string contains `{` or `}`. MDX's JSX parser treats `{` as a JS expression
+  boundary, delivering `undefined` as the prop. Always put chart strings in a
+  TypeScript wrapper component as a module-level `const`.
+
+### Tooltips and Popovers
+
+- **Never** use `position: absolute` + `z-index` alone for tooltips inside a
+  scroll container or an element with `overflow: hidden/auto`. The ancestor's
+  overflow clips the tooltip regardless of z-index.
+- Any tooltip that must appear above a scroll container **must** use a React
+  portal (`createPortal(..., document.body)`) with `position: fixed` coordinates
+  derived from `getBoundingClientRect()` — this escapes all ancestor overflow
+  constraints. See `PassiveFlow.tsx` for the reference implementation.
+
+---
+
 ## Project Purpose
 
 An open-source, interactive system design learning platform that teaches FAANG-tier distributed systems concepts visually — through live code, production-grade schemas, Mermaid.js diagrams, Framer Motion animations, and interview prep. Built with Next.js, Node.js, Express.js, and MongoDB.
@@ -242,7 +283,7 @@ Topics are implemented sequentially, one at a time, fully completed before the n
 Before marking a topic as done and moving to the next:
 
 - [ ] **ELI5 section** written and passes the 10-year-old standard
-- [ ] **FAANG Deep-Dive** written with at least one named real-world system (Netflix, Google, Discord, etc.)
+- [ ] **Big Tech Deep-Dive** written with at least one named real-world system (Netflix, Google, Discord, etc.)
 - [ ] **Prerequisites block** declared with links to dependency topics
 - [ ] **Next.js / Express implementation** is working, not pseudocode
 - [ ] **Mongoose schema** defined with TypeScript types

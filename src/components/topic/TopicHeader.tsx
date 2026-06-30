@@ -4,18 +4,19 @@ import { cn } from '@/lib/utils'
 import type { Topic } from '@/types/topic'
 import type { TopicFrontmatter } from '@/types/mdx'
 
-// bg-*-100 / text-*-800 in light mode: visible badge tint with readable contrast.
-// dark: 10% opacity bg keeps the tint subtle on dark surfaces.
+// MDN docs palette for light mode: very light tinted bg + high-contrast dark text.
+// The values below are direct matches to MDN's Baseline badge colors (#e3f5d8/#1a6e3c etc.).
+// Dark mode: 10% opacity bg + muted 400-level text — consistent with dark surface contrast.
 const DIFFICULTY_STYLES: Record<Topic['difficulty'], string> = {
-  easy:   'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-400',
-  medium: 'bg-amber-100   text-amber-800   dark:bg-amber-500/10   dark:text-amber-400',
-  hard:   'bg-rose-100    text-rose-800    dark:bg-rose-500/10    dark:text-rose-400',
+  easy:   'bg-green-100  text-green-900  dark:bg-emerald-500/10 dark:text-emerald-400',
+  medium: 'bg-amber-50   text-amber-900  dark:bg-amber-500/10   dark:text-amber-400',
+  hard:   'bg-red-100    text-red-900    dark:bg-rose-500/10    dark:text-rose-400',
 }
 
 const FREQ_STYLES: Record<Topic['interviewFrequency'], string> = {
-  high:   'bg-violet-100 text-violet-800 dark:bg-violet-500/10 dark:text-violet-400',
-  medium: 'bg-sky-100    text-sky-800    dark:bg-sky-500/10    dark:text-sky-400',
-  low:    'bg-zinc-100   text-zinc-700   dark:bg-zinc-500/10   dark:text-zinc-400',
+  high:   'bg-blue-100  text-blue-900  dark:bg-violet-500/10 dark:text-violet-400',
+  medium: 'bg-gray-200  text-gray-600  dark:bg-sky-500/10    dark:text-sky-400',
+  low:    'bg-gray-100  text-gray-500  border border-gray-300 dark:bg-zinc-500/10 dark:text-zinc-400 dark:border-zinc-700',
 }
 
 const FREQ_LABELS: Record<Topic['interviewFrequency'], string> = {

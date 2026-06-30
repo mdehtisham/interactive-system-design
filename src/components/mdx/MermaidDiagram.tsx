@@ -11,94 +11,103 @@ interface Props {
 /**
  * Client-side Mermaid diagram renderer.
  *
- * Mermaid is a browser-only library (~1.4 MB). We load it via dynamic import
- * inside useEffect so it is never bundled into the SSR payload and is
- * code-split as a separate chunk that loads only when this component mounts.
+ * KEY ARCHITECTURE DECISION — why dangerouslySetInnerHTML, not innerHTML:
  *
- * Re-renders on theme change by reinitialising Mermaid with the matching
- * theme ('dark' / 'default') before re-rendering the SVG.
+ * The original implementation called `containerRef.current.innerHTML = svg`
+ * directly. This caused a React "removeChild" NotFoundError because:
+ *   1. React renders <span>Rendering…</span> as a managed child of the container.
+ *   2. Mermaid replaces innerHTML, removing that span outside React's knowledge.
+ *   3. React later tries to remove the span it still tracks — but it's gone.
+ *
+ * Fix: store the SVG in React state and render it via dangerouslySetInnerHTML.
+ * The loading <span> and the SVG output live in mutually exclusive branches,
+ * so React never has concurrent ownership of the same DOM node.
  */
 export function MermaidDiagram({ chart, caption }: Props) {
   const { resolvedTheme } = useTheme()
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [error, setError] = useState<string | null>(null)
+  const svgContainerRef = useRef<HTMLDivElement>(null)
+  const bindFnRef = useRef<((el: Element) => void) | null>(null)
+
+  const [svgContent, setSvgContent] = useState<string | null>(null)
+  const [error, setError]           = useState<string | null>(null)
   const [isRendering, setIsRendering] = useState(true)
 
-  // useId returns ":r0:" etc. — strip all non-alphanumeric characters to produce
-  // a valid HTML id (Mermaid uses the id as an SVG element id internally).
-  const rawId = useId()
+  // useId returns ":r0:" etc. Strip non-alphanumeric chars — Mermaid uses the
+  // id as an SVG element id internally and requires a valid identifier.
+  const rawId    = useId()
   const diagramId = `mermaid-${rawId.replace(/[^a-zA-Z0-9]/g, '')}`
 
   useEffect(() => {
     let cancelled = false
     setError(null)
+    setSvgContent(null)
     setIsRendering(true)
 
     async function render() {
       try {
         const { default: mermaid } = await import('mermaid')
-
         if (cancelled) return
 
         mermaid.initialize({
           startOnLoad: false,
-          theme: resolvedTheme === 'dark' ? 'dark' : 'default',
+          theme:         resolvedTheme === 'dark' ? 'dark' : 'neutral',
           securityLevel: 'loose',
-          fontFamily: 'inherit',
-          fontSize: 14,
+          fontFamily:    'inherit',
+          fontSize:      14,
         })
 
-        // Mermaid's render function produces the SVG string and an optional
-        // cleanup function for any event listeners it attached.
         const { svg, bindFunctions } = await mermaid.render(diagramId, chart)
+        if (cancelled) return
 
-        if (cancelled || !containerRef.current) return
-
-        containerRef.current.innerHTML = svg
-
-        // bindFunctions wires up interactive elements (e.g. click handlers).
-        // It is safe to call even when the diagram has no interactive elements.
-        if (bindFunctions) {
-          bindFunctions(containerRef.current)
-        }
-
+        // Store bindFunctions in a ref so we can call it after React commits
+        // the dangerouslySetInnerHTML update to the real DOM.
+        bindFnRef.current = bindFunctions ?? null
+        setSvgContent(svg)
         setIsRendering(false)
       } catch (err) {
         if (cancelled) return
-        const message =
-          err instanceof Error ? err.message : 'Diagram failed to render'
-        setError(message)
+        setError(err instanceof Error ? err.message : 'Diagram failed to render')
         setIsRendering(false)
       }
     }
 
     render()
-
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [chart, resolvedTheme, diagramId])
+
+  // After React commits the dangerouslySetInnerHTML update, wire up any
+  // interactive click handlers Mermaid produced (e.g. for flowchart links).
+  useEffect(() => {
+    if (svgContent && svgContainerRef.current && bindFnRef.current) {
+      bindFnRef.current(svgContainerRef.current)
+    }
+  }, [svgContent])
 
   return (
     <figure className="my-8">
-      {/* Horizontal scroll prevents page-level overflow on narrow viewports */}
-      <div className="overflow-x-auto rounded-lg border border-border bg-muted/30 p-4">
+      <div className="overflow-x-auto rounded-lg border border-border bg-transparent p-4">
         {error ? (
           <p className="text-center text-sm text-destructive">
             ⚠ Diagram error: {error}
           </p>
+        ) : isRendering ? (
+          // Loading state — a plain React-managed element with no ref.
+          // Crucially, it is NOT a sibling of the SVG container below, so
+          // React never tries to remove it from the SVG container's DOM node.
+          <div className="flex min-h-[100px] items-center justify-center">
+            <span className="text-sm text-muted-foreground">
+              Rendering diagram…
+            </span>
+          </div>
         ) : (
+          // SVG output — dangerouslySetInnerHTML tells React about the update,
+          // preventing the removeChild mismatch that direct innerHTML caused.
           <div
-            ref={containerRef}
+            ref={svgContainerRef}
             className="flex min-h-[100px] items-center justify-center"
             aria-label="Mermaid diagram"
-          >
-            {isRendering && (
-              <span className="text-sm text-muted-foreground">
-                Rendering diagram…
-              </span>
-            )}
-          </div>
+            dangerouslySetInnerHTML={{ __html: svgContent ?? '' }}
+          />
         )}
       </div>
 
