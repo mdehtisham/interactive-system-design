@@ -121,7 +121,7 @@ function GeoDnsCanvas({ values }: { values: ControlValues; options: AnimationOpt
 
   const bestMs  = LATENCY[locationId][nearestDc]
   const worstDc = DC_ORDER.reduce((w, id) =>
-    LATENCY[locationId][id] > LATENCY[locationId][w] ? id : w, DC_ORDER[0])
+    LATENCY[locationId][id] > LATENCY[locationId][w] ? id : w, DC_ORDER[0] as DcId)
   const worstMs = LATENCY[locationId][worstDc]
   const speedup = Math.round(worstMs / bestMs)
 
