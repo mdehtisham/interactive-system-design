@@ -15,6 +15,14 @@ import { DnsFailureModes } from '@/components/animations/topics/DnsFailureModes'
 import { DnsErDiagram } from '@/components/diagrams/DnsErDiagram'
 import { DnsResolutionDiagram } from '@/components/diagrams/DnsResolutionDiagram'
 import { WebRequestLifecycle } from '@/components/diagrams/WebRequestLifecycle'
+// Topic 02: APIs & REST — animations
+import { RestRequestFlow } from '@/components/animations/topics/RestRequestFlow'
+import { HttpMethodsExplorer } from '@/components/animations/topics/HttpMethodsExplorer'
+import { OverfetchingComparative } from '@/components/animations/topics/OverfetchingComparative'
+import { StatusCodeSimulator } from '@/components/animations/topics/StatusCodeSimulator'
+// Topic 02: APIs & REST — diagrams
+import { ApiErDiagram } from '@/components/diagrams/ApiErDiagram'
+import { ApiDataFlowDiagram } from '@/components/diagrams/ApiDataFlowDiagram'
 
 /**
  * Converts any string to a URL-safe anchor ID.
@@ -143,8 +151,7 @@ export const mdxComponents: MDXComponents = {
 
   th: ({ children, ...props }) => (
     <th
-      className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider"
-      style={{ backgroundColor: 'hsl(var(--muted))', color: 'hsl(var(--muted-foreground))' }}
+      className="ui-table-header px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider"
       {...props}
     >
       {children}
@@ -181,4 +188,14 @@ export const mdxComponents: MDXComponents = {
   DnsErDiagram,
   DnsResolutionDiagram,
   WebRequestLifecycle,
+
+  // ── Topic 02: APIs & REST — animations ────────────────────────────────────
+  RestRequestFlow,
+  HttpMethodsExplorer,
+  OverfetchingComparative,
+  StatusCodeSimulator,
+
+  // ── Topic 02: APIs & REST — diagrams ──────────────────────────────────────
+  ApiErDiagram,
+  ApiDataFlowDiagram,
 }

@@ -1,9 +1,50 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* ─── Design tokens — all values are explicit hex/color (no HSL) ────────────
+   Tailwind utility classes (bg-muted, text-muted-foreground, border-border,
+   bg-card, bg-accent, etc.) only work if --color-* is mapped in @theme inline.
+   Every variable here has a corresponding @theme inline entry below.
+   ──────────────────────────────────────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Core surface */
+  --background:        #ffffff;
+  --foreground:        #111827;   /* gray-900 — main body text */
+
+  /* Cards and popovers */
+  --card:              #ffffff;
+  --card-foreground:   #111827;
+  --popover:           #ffffff;
+  --popover-foreground:#111827;
+
+  /* Primary (buttons, links) */
+  --primary:           #111827;
+  --primary-foreground:#f9fafb;
+
+  /* Secondary */
+  --secondary:         #f3f4f6;   /* gray-100 */
+  --secondary-foreground: #111827;
+
+  /* Muted — used for subtle backgrounds and secondary text.
+     --muted-foreground is intentionally darker than shadcn's default (~46%
+     lightness) so it is actually readable on white. */
+  --muted:             #f3f4f6;   /* gray-100 */
+  --muted-foreground:  #4b5563;   /* gray-600 — ~37% lightness, clearly readable */
+
+  /* Accent — used for hover states on buttons/tabs.
+     Was near-white before (the bug); now gray-200 so hover is always visible. */
+  --accent:            #e5e7eb;   /* gray-200 */
+  --accent-foreground: #111827;
+
+  /* Destructive */
+  --destructive:        #dc2626;
+  --destructive-foreground: #ffffff;
+
+  /* Borders and inputs */
+  --border:            #e5e7eb;   /* gray-200 */
+  --input:             #e5e7eb;
+  --ring:              #6b7280;   /* gray-500 */
 
   /* Animation colour system — consistent across all topic animations */
   --anim-success: #22c55e;
@@ -12,31 +53,97 @@
   --anim-data:    #3b82f6;
   --anim-idle:    #6b7280;
 
-  /* shadcn/ui CSS variables */
   --radius: 0.5rem;
 }
 
-@theme inline {
-  --color-background:   var(--background);
-  --color-foreground:   var(--foreground);
-  --color-anim-success: var(--anim-success);
-  --color-anim-error:   var(--anim-error);
-  --color-anim-pending: var(--anim-pending);
-  --color-anim-data:    var(--anim-data);
-  --color-anim-idle:    var(--anim-idle);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+.dark {
+  --background:        #0a0a0a;
+  --foreground:        #f9fafb;   /* gray-50 */
+
+  --card:              #111827;   /* gray-900 */
+  --card-foreground:   #f9fafb;
+  --popover:           #111827;
+  --popover-foreground:#f9fafb;
+
+  --primary:           #f9fafb;
+  --primary-foreground:#111827;
+
+  --secondary:         #1f2937;   /* gray-800 */
+  --secondary-foreground: #f9fafb;
+
+  --muted:             #1f2937;   /* gray-800 */
+  --muted-foreground:  #9ca3af;   /* gray-400 — clearly readable on dark bg */
+
+  --accent:            #374151;   /* gray-700 — visible hover on dark */
+  --accent-foreground: #f9fafb;
+
+  --destructive:        #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --border:            #374151;   /* gray-700 */
+  --input:             #374151;
+  --ring:              #9ca3af;   /* gray-400 */
 }
 
-.dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+/* ─── Map every token to a Tailwind @theme color so utilities work ────────── */
+
+@theme inline {
+  --color-background:            var(--background);
+  --color-foreground:            var(--foreground);
+  --color-card:                  var(--card);
+  --color-card-foreground:       var(--card-foreground);
+  --color-popover:               var(--popover);
+  --color-popover-foreground:    var(--popover-foreground);
+  --color-primary:               var(--primary);
+  --color-primary-foreground:    var(--primary-foreground);
+  --color-secondary:             var(--secondary);
+  --color-secondary-foreground:  var(--secondary-foreground);
+  --color-muted:                 var(--muted);
+  --color-muted-foreground:      var(--muted-foreground);
+  --color-accent:                var(--accent);
+  --color-accent-foreground:     var(--accent-foreground);
+  --color-destructive:           var(--destructive);
+  --color-destructive-foreground:var(--destructive-foreground);
+  --color-border:                var(--border);
+  --color-input:                 var(--input);
+  --color-ring:                  var(--ring);
+  --color-anim-success:          var(--anim-success);
+  --color-anim-error:            var(--anim-error);
+  --color-anim-pending:          var(--anim-pending);
+  --color-anim-data:             var(--anim-data);
+  --color-anim-idle:             var(--anim-idle);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* ─── Explicit component classes — zero reliance on CSS variable resolution ─
+   The Tailwind v4 prose plugin overrides utility classes on <th>, <td>, and
+   <table> using high-specificity :where() selectors. These classes use
+   !important so they win in every context (prose or not).
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Table header cells */
+.ui-table-header {
+  background-color: #f1f5f9 !important; /* slate-100 */
+  color:            #1e293b !important; /* slate-900 — high contrast */
+}
+.dark .ui-table-header {
+  background-color: #27272a !important; /* zinc-800 */
+  color:            #f4f4f5 !important; /* zinc-100 */
+}
+
+/* Code block top bar — language label */
+.ui-code-label {
+  color: #374151; /* gray-700 */
+}
+.dark .ui-code-label {
+  color: #d1d5db; /* gray-300 */
 }
 
 /*
