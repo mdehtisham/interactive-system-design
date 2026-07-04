@@ -14,12 +14,42 @@ All confirmed bugs and their fixes are tracked in `issues_and_fixes.md` at the
 project root. Every rule below was learned the hard way — violating them will
 reproduce the exact same bugs in new components.
 
+### CSS Variables and Color Classes
+
+- **Never write** `hsl(var(--anything))` in inline styles — the CSS variables in
+  this project are defined as hex values (`--foreground: #111827`), not HSL
+  component triplets. `hsl(#111827)` is invalid CSS and the browser silently
+  ignores the entire declaration. Use `var(--foreground)` directly (no `hsl()`
+  wrapper) when you must use a CSS variable in an inline style.
+- **Never rely on `bg-muted`, `text-muted-foreground`, `bg-accent`, `border-border`
+  etc. for elements where the Tailwind v4 prose plugin can override them** (table
+  cells, headings, etc.). The prose plugin uses high-specificity `:where()` selectors.
+  For these elements, use the explicit CSS classes defined in `globals.css`:
+  - `ui-table-header` — table `<th>` cells (slate-100 bg + slate-900 text / zinc-800 + zinc-100 dark)
+  - `ui-code-label` — code block language label (gray-700 / gray-300 dark)
+  Add new `ui-*` classes to `globals.css` with `!important` whenever you need
+  a color that must survive prose or other high-specificity overrides.
+
 ### Colors
 
-- **Never** use `bg-accent` or `hover:bg-accent` for interactive states —
-  `--accent` resolves to near-white in the default shadcn neutral light theme
-  and produces invisible feedback. Use explicit Tailwind palette classes instead:
-  `bg-blue-50 text-blue-700` (active), `hover:bg-gray-50` (hover).
+- **Never** use `bg-accent`, `hover:bg-accent`, or `hover:text-accent-foreground`
+  for any interactive state — `--accent` resolves to near-white in the default
+  shadcn neutral light theme, making hover feedback invisible. This applies to
+  **all** components including `Button` variants (outline, ghost), icon buttons,
+  tab selectors, and any element with a hover state. Always use explicit Tailwind
+  palette classes: `hover:bg-gray-100 dark:hover:bg-zinc-700 hover:text-gray-900
+  dark:hover:text-zinc-100` for hover, `hover:bg-gray-200 dark:hover:bg-zinc-600`
+  for more visible emphasis.
+- **Never** use `text-muted-foreground` or `color: hsl(var(--muted-foreground))`
+  for labels, table headers, button text, or any actionable / important UI text —
+  `--muted-foreground` resolves to a very light grey (~46% lightness) that is
+  barely readable on white backgrounds. Reserve `text-muted-foreground` for
+  truly secondary/decorative text (captions, timestamps, empty-state hints).
+  For table headers and button labels always use `text-foreground` or explicit
+  palette classes (`text-zinc-700 dark:text-zinc-300`).
+- **Always** add `active:scale-[0.97] transition-[colors,transform]` to clickable
+  buttons and icon buttons — the press animation provides critical feedback that
+  a click registered. Without it, buttons feel broken on both desktop and touch.
 - Badge/tag styles must follow `bg-*-100 text-*-900` (light) /
   `bg-*-500/10 text-*-400` (dark). Never use ring-based badges.
 - Always add `prose-p:text-foreground prose-li:text-foreground prose-td:text-foreground`

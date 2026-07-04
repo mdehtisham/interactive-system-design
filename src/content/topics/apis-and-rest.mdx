@@ -11,28 +11,744 @@ prerequisites:
 
 ## ELI5 Foundation
 
-_Full content coming in Phase 03._
+Imagine you walk into a restaurant. You don't walk into the kitchen and grab food yourself — you use a menu. The menu tells you what dishes are available, what you call each one, and what you get back. You tell the waiter "I'd like dish #5," the waiter goes to the kitchen, and brings it back. You don't need to know how the chef cooks it.
+
+An **API** (Application Programming Interface) is that menu and waiter combined. Your application is the customer. Some other system — a database, a payment processor, a weather service — is the kitchen. The API defines the exact words you use to ask for something and the exact format you'll get it back in.
+
+**REST** is a set of rules for how that menu should be designed. REST stands for Representational State Transfer — but ignore the name. What it means in practice: every piece of data has a unique web address (a URL), and you interact with it using standard verbs. You GET things to read them, POST things to create them, PUT or PATCH to update them, and DELETE to remove them.
+
+Without APIs, every application would need to understand every other application's internal code. APIs are the universal handshake that lets completely different systems — a React app, a Python script, a mobile app — talk to each other using a shared language.
+
+---
 
 ## Big Tech Deep-Dive
 
-_Full content coming in Phase 03._
+### The Six REST Constraints — From Roy Fielding's 2000 Dissertation
+
+REST is not a specification or a protocol. It is an **architectural style** defined by Roy Fielding in his 2000 PhD dissertation at UC Irvine. Fielding was one of the principal authors of HTTP/1.1 — he was describing the constraints that made HTTP scale to the size of the early web. An API is "RESTful" only if it satisfies all six constraints.
+
+**1. Client-Server** — The client handles the user interface; the server handles data storage. They are deployed and scaled independently. A React app and an Express server can be upgraded, replaced, or rewritten without affecting each other as long as the API contract stays the same.
+
+**2. Stateless** — Every single request must contain all the information the server needs to process it. The server holds zero session state between requests. Auth token, pagination cursor, filter params — everything lives in the request. This is the constraint that makes horizontal scaling trivial: any server in the pool can handle any request because none of them remember previous ones.
+
+**3. Cacheable** — Responses must declare themselves as cacheable or non-cacheable. `Cache-Control: max-age=300` tells proxies and browsers to cache the response for 5 minutes. GET responses are cacheable by default; POST, PUT, DELETE are not. Caching is what lets CDNs serve API responses from the edge.
+
+**4. Uniform Interface** — This is REST's defining constraint, with four sub-constraints:
+
+- **Resource identification in requests**: Resources are identified by URLs. `/users/123` identifies one specific user — not a user list, not a search query. The URL is the resource's permanent address.
+- **Resource manipulation through representations**: Clients interact with resources through representations — typically JSON or XML. You never modify the server's database directly; you send a representation to the server and it decides what to change.
+- **Self-descriptive messages**: Each message contains enough information to describe how to process it. The `Content-Type: application/json` header tells the receiver how to parse the body. The `Authorization` header tells it who is making the request.
+- **HATEOAS** (Hypermedia as the Engine of Application State): Responses include links to related actions. A response for `GET /orders/123` would include `{"_links": {"pay": "/orders/123/payment", "cancel": "/orders/123/cancel"}}` — the client discovers available next actions from the response, instead of hard-coding URLs. This is the most powerful and most ignored REST constraint. GitHub's REST API v3 does not implement HATEOAS. Stripe partially does.
+
+**5. Layered System** — The client cannot tell whether it is connected directly to the origin server or to an intermediary (load balancer, CDN, API gateway). Each layer only knows about the adjacent layer. This is how Cloudflare can sit in front of any REST API and cache responses transparently.
+
+**6. Code on Demand (optional)** — Servers can send executable code to clients (JavaScript, Java applets). The only optional constraint. Used rarely in REST APIs; more common in browser-based applications.
+
+**The uncomfortable truth:** most APIs called "RESTful" in the wild violate at least one constraint — almost always HATEOAS. What most developers mean by "REST API" is "an HTTP API with resource-based URLs and JSON responses." That is not technically REST, but the term has colloquially expanded to include it.
+
+---
+
+### HTTP Methods: Safe, Idempotent, or Neither?
+
+These properties come from RFC 9110 (HTTP Semantics, June 2022 — the current specification that supersedes RFC 7231):
+
+**Safe** means the request does not modify server state. Safe methods can be called freely by automated tools, prefetch logic, and crawlers. GET, HEAD, OPTIONS are safe.
+
+**Idempotent** means calling the method N times has the same result as calling it once. Idempotency is about the end state, not the response. Deleting a resource twice: first call deletes it (204), second call may return 404 — but the end state (resource gone) is identical both times, so DELETE is idempotent.
+
+| Method  | Safe | Idempotent | Request Body | Success Code |
+|---------|------|------------|-------------|--------------|
+| GET     | Yes  | Yes        | No          | 200 OK       |
+| HEAD    | Yes  | Yes        | No          | 200 (no body)|
+| OPTIONS | Yes  | Yes        | No          | 200 / 204    |
+| POST    | No   | **No**     | Yes         | 201 Created  |
+| PUT     | No   | Yes        | Yes         | 200 / 204    |
+| PATCH   | No   | **No**\*   | Yes         | 200 / 204    |
+| DELETE  | No   | Yes        | No          | 204 No Content|
+
+\*PATCH is not required to be idempotent by RFC 5789. `SET status = "published"` is idempotent; `INCREMENT view_count` is not. Design matters.
+
+**PUT vs PATCH — the most commonly confused pair:** PUT replaces the entire resource. If you `PUT {"name": "John"}` on `/users/123`, the `email`, `phone`, and every other field not in the body are deleted or reset to defaults. PATCH applies a partial update — only the fields in the body change. Most "update" endpoints should be PATCH, not PUT.
+
+---
+
+### HTTP Status Codes: The Machine-Readable Contract
+
+Status codes from RFC 9110 are a machine-readable contract between server and client. Every intermediary — CDN, load balancer, monitoring tool, retry middleware — reads the status code to decide what to do next. Using the wrong code corrupts every layer simultaneously.
+
+**2xx — Success**
+
+- **200 OK** — Generic success. The response body contains the result.
+- **201 Created** — A new resource was created. Include a `Location` header pointing to the new resource's URL. This is required by RFC 9110.
+- **202 Accepted** — Request accepted but not yet processed (async job queued). The client should poll a status endpoint.
+- **204 No Content** — Success with no response body. Standard for DELETE. Also used for PUT/PATCH when the server returns no body.
+
+**3xx — Redirection**
+
+- **301 Moved Permanently** — Update bookmarks. CDNs and browsers cache this forever. Use when a URL will never come back.
+- **302 Found** — Temporary redirect. Browsers follow it but do not cache it.
+- **304 Not Modified** — The client's cached version is still valid (ETag or Last-Modified matched). No body. Saves bandwidth.
+
+**4xx — Client Errors (the client did something wrong)**
+
+- **400 Bad Request** — Malformed syntax. Broken JSON, wrong Content-Type, invalid URL parameter.
+- **401 Unauthorized** — "I don't know who you are." Authentication is required or the token is invalid. Despite the name, this is about authentication, not authorization.
+- **403 Forbidden** — "I know who you are, but you cannot do this." The user is authenticated but lacks permission.
+- **404 Not Found** — Resource does not exist at this URL. Can mean "never existed" or "deleted" — use 410 Gone if you want to signal permanent deletion.
+- **405 Method Not Allowed** — The HTTP method is wrong for this endpoint. Include an `Allow` header listing what IS allowed.
+- **409 Conflict** — State conflict. Creating a user with an email that already exists. Creating a resource with a duplicate slug. The client must resolve the conflict before retrying.
+- **410 Gone** — Resource existed and was permanently deleted. Unlike 404, this tells clients to remove the URL from bookmarks/links.
+- **422 Unprocessable Entity** — The request was syntactically valid JSON but failed business-logic validation. Return field-level errors so the client can show them in a form.
+- **429 Too Many Requests** — Rate limited. Include `Retry-After` header telling the client when to try again.
+
+**5xx — Server Errors (the server failed)**
+
+- **500 Internal Server Error** — Unhandled exception on the server. The client did nothing wrong; retry may succeed.
+- **502 Bad Gateway** — The server acting as a gateway received an invalid response from an upstream server.
+- **503 Service Unavailable** — Server is temporarily down (overloaded or in maintenance). Include `Retry-After`.
+- **504 Gateway Timeout** — The upstream server did not respond in time. Distinct from 503: the gateway is up, the upstream is not.
+
+---
+
+### API Versioning Strategies
+
+**URI Path Versioning** `/api/v1/users`
+
+The most common approach in production. The version is visible in logs, browser address bars, curl commands, and load balancer rules. You can run v1 and v2 side by side indefinitely — route them in nginx with a simple location block. The downside: the version is semantically part of the URL but not conceptually part of the resource. Who is "User v1" vs "User v2"? They're the same user.
+
+Used by: Twitter API (`/1.1/`, `/2/`), Twilio (`/2010-04-01/`), GitHub REST API.
+
+**Header Versioning** `API-Version: 2` or `Accept: application/vnd.myapi+json;version=2`
+
+The most RESTful approach — versioning does not pollute the resource URL. The same URL `/api/users/123` always refers to the same user; the version is a processing instruction. Harder to test manually (cannot type it in a browser), harder to share links, harder to route at the load balancer level. Almost no public API uses this as the primary versioning mechanism.
+
+**Query Parameter Versioning** `/api/users?version=2`
+
+Simple but messy. Query parameters are often stripped by CDN caches or treated as separate cache keys unpredictably. Easy to forget when writing request code. Not recommended for public APIs.
+
+**Stripe's Hybrid Approach — the gold standard**
+
+Stripe has maintained `/v1/` as their only URI version for over a decade. They make non-breaking changes freely. For breaking changes, they add a dated version snapshot (e.g., `Stripe-Version: 2024-06-20`). Your account defaults to the version active when you registered. You opt into newer versions explicitly. Breaking changes become opt-in instead of forced migrations — this is the most thoughtful versioning approach in the industry.
+
+---
+
+### REST vs GraphQL vs gRPC
+
+---
+
+### GraphQL — Schema-First, Client-Driven Queries
+
+**Origin:** Facebook's News Feed on 3G mobile (2012) required 30+ REST calls per screen load. Engineers built GraphQL so a mobile client could declare exactly the fields it needed in a single request. Open-sourced in 2015.
+
+#### How GraphQL Works
+
+GraphQL has **one endpoint** (`POST /graphql`). Everything — reads, writes, real-time — goes through it. The client sends a query document describing what it wants; the server returns exactly that shape, nothing more.
+
+Three operation types:
+- **Query** — read data (equivalent to GET)
+- **Mutation** — write data (equivalent to POST/PUT/DELETE)
+- **Subscription** — real-time stream over WebSocket
+
+**Step 1 — Define the schema (SDL — Schema Definition Language)**
+
+The schema is the contract between client and server. It is strongly typed and serves as auto-generated documentation.
+
+```graphql
+# schema.graphql
+type User {
+  id:        ID!
+  name:      String!
+  email:     String!
+  posts:     [Post!]!
+}
+
+type Post {
+  id:        ID!
+  title:     String!
+  body:      String!
+  status:    PostStatus!
+  author:    User!
+  comments:  [Comment!]!
+  createdAt: String!
+}
+
+enum PostStatus { DRAFT  PUBLISHED  ARCHIVED }
+
+type Comment {
+  id:        ID!
+  body:      String!
+  author:    User!
+}
+
+# Entry points — equivalent to REST route definitions
+type Query {
+  user(id: ID!): User
+  posts(status: PostStatus): [Post!]!
+}
+
+type Mutation {
+  createPost(title: String!, body: String!): Post!
+  publishPost(id: ID!): Post!
+}
+
+type Subscription {
+  commentAdded(postId: ID!): Comment!
+}
+```
+
+**Step 2 — Write resolvers (Node.js, Apollo Server)**
+
+Each field in the schema has a resolver function that fetches the data for that field. Resolvers form a tree — the server walks the tree in parallel where possible.
+
+```ts
+// resolvers.ts
+import { Post } from './models/Post'
+import { User } from './models/User'
+import { pubsub } from './pubsub'
+
+export const resolvers = {
+  Query: {
+    // Called when a client runs: query { user(id: "123") { name } }
+    user: (_: unknown, args: { id: string }) =>
+      User.findById(args.id),
+
+    posts: (_: unknown, args: { status?: string }) =>
+      Post.find(args.status ? { status: args.status } : {}),
+  },
+
+  Mutation: {
+    // Called when a client runs: mutation { createPost(title: "...", body: "...") { id } }
+    createPost: async (
+      _: unknown,
+      args: { title: string; body: string },
+      context: { userId: string }
+    ) => {
+      if (!context.userId) throw new Error('Unauthenticated')
+      return Post.create({ ...args, authorId: context.userId, status: 'DRAFT' })
+    },
+
+    publishPost: async (_: unknown, args: { id: string }, context: { userId: string }) => {
+      const post = await Post.findOneAndUpdate(
+        { _id: args.id, authorId: context.userId },
+        { status: 'PUBLISHED' },
+        { new: true }
+      )
+      if (!post) throw new Error('Post not found or not yours')
+      return post
+    },
+  },
+
+  // Field resolvers — called for each Post object to resolve nested fields.
+  // GraphQL batches these with DataLoader to avoid N+1 queries.
+  Post: {
+    author: (post: { authorId: string }) => User.findById(post.authorId),
+    comments: (post: { id: string }) => Comment.find({ postId: post.id }),
+  },
+
+  Subscription: {
+    commentAdded: {
+      subscribe: (_: unknown, args: { postId: string }) =>
+        pubsub.asyncIterator(`COMMENT_ADDED_${args.postId}`),
+    },
+  },
+}
+```
+
+**Step 3 — Wire up Apollo Server**
+
+```ts
+// server.ts
+import { ApolloServer } from '@apollo/server'
+import { expressMiddleware } from '@apollo/server/express4'
+import { readFileSync } from 'fs'
+
+const typeDefs = readFileSync('./schema.graphql', 'utf-8')
+
+const server = new ApolloServer({ typeDefs, resolvers })
+await server.start()
+
+app.use('/graphql', expressMiddleware(server, {
+  context: async ({ req }) => ({
+    userId: verifyJwt(req.headers.authorization),
+  }),
+}))
+```
+
+**Step 4 — What the client sends**
+
+```graphql
+# Client sends this in the POST body as { "query": "..." }
+query GetPostWithAuthor {
+  post(id: "507f1f77") {
+    title
+    status
+    author {
+      name
+    }
+    comments {
+      body
+    }
+  }
+}
+```
+
+```json
+// Server returns exactly this shape — no extra fields
+{
+  "data": {
+    "post": {
+      "title": "REST APIs Explained",
+      "status": "PUBLISHED",
+      "author": { "name": "Sarah Connor" },
+      "comments": [{ "body": "Great post!" }]
+    }
+  }
+}
+```
+
+**The N+1 problem — GraphQL's biggest gotcha:** If you have 10 posts and each Post resolver calls `User.findById(post.authorId)`, that's 10 separate DB queries for author data — one per post. The fix is **DataLoader**, which batches and deduplicates those 10 queries into a single `User.find({ _id: { $in: [...ids] } })`. Every production GraphQL server must use DataLoader on any field that resolves a relationship.
+
+**When to choose GraphQL:**
+- Frontend teams are independent from backend teams and move fast — they can fetch exactly what they need without waiting for a new endpoint
+- Mobile clients on slow networks where bandwidth is expensive
+- A single API must serve many different clients (web, iOS, Android, partner integrations) with different data needs
+
+---
+
+### gRPC — Contract-First RPC for Microservices
+
+**Origin:** Google has run gRPC internally (as "Stubby") since ~2001 to connect thousands of microservices. They open-sourced it in 2015. The name stands for "gRPC Remote Procedure Calls."
+
+#### How gRPC Works
+
+gRPC is not a REST API. It is a **Remote Procedure Call** framework — the client calls a function as if it were local, and the framework handles the network transparently. Under the hood: HTTP/2 for transport, Protocol Buffers for serialization.
+
+Three things make gRPC fast:
+1. **HTTP/2** — requests are multiplexed over one persistent TCP connection. No 3-way handshake per call, no head-of-line blocking.
+2. **Protobuf** — fields are encoded as binary with a field number tag, not text keys. `{"name":"John"}` (14 bytes) → `\x0a\x04John` (6 bytes). ~5–10× smaller, ~5× faster to serialize/deserialize than JSON.
+3. **Code generation** — one `.proto` file generates type-safe client and server stubs in every language simultaneously.
+
+**Step 1 — Define the service contract (`.proto` file)**
+
+```proto
+// user_service.proto
+syntax = "proto3";
+
+package user;
+
+// The service definition — like an interface
+service UserService {
+  // Unary: one request, one response (most common)
+  rpc GetUser (GetUserRequest) returns (User);
+  rpc CreateUser (CreateUserRequest) returns (User);
+
+  // Server-streaming: one request, stream of responses
+  // e.g. "stream me all activity events for this user"
+  rpc StreamUserActivity (GetUserRequest) returns (stream ActivityEvent);
+
+  // Client-streaming: stream of requests, one response
+  // e.g. "upload a batch of records, tell me how many succeeded"
+  rpc BatchCreateUsers (stream CreateUserRequest) returns (BatchResult);
+
+  // Bidirectional streaming: both sides stream simultaneously
+  // e.g. live chat, collaborative editing
+  rpc Chat (stream ChatMessage) returns (stream ChatMessage);
+}
+
+message GetUserRequest  { string id = 1; }
+
+message CreateUserRequest {
+  string name  = 1;
+  string email = 2;
+}
+
+message User {
+  string id         = 1;
+  string name       = 2;
+  string email      = 3;
+  int64  created_at = 4;  // Unix timestamp — integers are tiny in protobuf
+}
+
+message ActivityEvent {
+  string type      = 1;
+  string payload   = 2;
+  int64  timestamp = 3;
+}
+
+message BatchResult {
+  int32 created = 1;
+  int32 failed  = 2;
+}
+
+message ChatMessage {
+  string user_id = 1;
+  string text    = 2;
+  int64  sent_at = 3;
+}
+```
+
+Run `protoc` (or `grpc_tools_node_protoc`) to generate TypeScript stubs from this file.
+
+**Step 2 — Implement the server (Node.js)**
+
+```ts
+// user-service/server.ts
+import * as grpc from '@grpc/grpc-js'
+import * as protoLoader from '@grpc/proto-loader'
+import { User } from './models/User'
+
+// Load the .proto at runtime (alternatively use pre-generated stubs)
+const packageDef = protoLoader.loadSync('./user_service.proto', {
+  keepCase: true, longs: String, enums: String, defaults: true, oneofs: true,
+})
+const proto = grpc.loadPackageDefinition(packageDef) as any
+
+// Implement each RPC method
+const UserServiceImpl = {
+  // Unary — called like a normal async function
+  async GetUser(
+    call: grpc.ServerUnaryCall<{ id: string }, unknown>,
+    callback: grpc.sendUnaryData<unknown>
+  ) {
+    const user = await User.findById(call.request.id)
+    if (!user) {
+      callback({ code: grpc.status.NOT_FOUND, message: 'User not found' })
+      return
+    }
+    callback(null, { id: user.id, name: user.name, email: user.email })
+  },
+
+  // Server-streaming — write multiple messages, then end the stream
+  async StreamUserActivity(call: grpc.ServerWritableStream<{ id: string }, unknown>) {
+    const cursor = ActivityLog.find({ userId: call.request.id }).cursor()
+    for await (const event of cursor) {
+      call.write({ type: event.type, payload: event.payload, timestamp: event.createdAt })
+    }
+    call.end()
+  },
+}
+
+const server = new grpc.Server()
+server.addService(proto.user.UserService.service, UserServiceImpl)
+server.bindAsync('0.0.0.0:50051', grpc.ServerCredentials.createInsecure(), () => {
+  console.log('gRPC UserService listening on :50051')
+})
+```
+
+**Step 3 — Call from another service (the client)**
+
+```ts
+// order-service/user-client.ts
+// This is the auto-generated stub — call it like a local function
+import * as grpc from '@grpc/grpc-js'
+import * as protoLoader from '@grpc/proto-loader'
+
+const packageDef = protoLoader.loadSync('./user_service.proto', { keepCase: true })
+const proto = grpc.loadPackageDefinition(packageDef) as any
+
+// Create a persistent channel — reused across all calls (cheap over HTTP/2)
+const client = new proto.user.UserService(
+  'user-service.internal:50051',
+  grpc.credentials.createInsecure()
+)
+
+// Promisify for async/await use
+function getUser(id: string): Promise<{ name: string; email: string }> {
+  return new Promise((resolve, reject) => {
+    client.GetUser({ id }, (err: Error, response: unknown) => {
+      if (err) reject(err)
+      else resolve(response as { name: string; email: string })
+    })
+  })
+}
+
+// In your order controller — looks like a local function call
+export async function getOrderWithUser(orderId: string) {
+  const order = await Order.findById(orderId)
+  const user = await getUser(order.userId)  // ← network call, but feels local
+  return { ...order.toJSON(), user }
+}
+```
+
+**The four gRPC call types — when to use each:**
+
+| Call type | Pattern | Use case |
+|-----------|---------|----------|
+| Unary | 1 request → 1 response | Most CRUD operations, auth checks |
+| Server-streaming | 1 request → stream of responses | Live logs, large dataset export, real-time feed |
+| Client-streaming | Stream of requests → 1 response | File/batch upload, telemetry ingestion |
+| Bidirectional streaming | Stream ↔ Stream | Live chat, collaborative editing, game state sync |
+
+**When to choose gRPC:**
+- Internal microservice communication where you control both client and server
+- High throughput at low latency — each protobuf call is 5–10× smaller than JSON
+- Strongly-typed contracts across polyglot services (Go service calling a Node.js service with zero ambiguity)
+- Any scenario requiring streaming (log tailing, real-time telemetry, live feeds)
+
+**What gRPC cannot do natively:** Browsers cannot speak gRPC directly (it requires HTTP/2 trailers, which browser Fetch API does not expose). You need a `grpc-web` proxy (Envoy) in front of any gRPC service that a browser must reach — this is why gRPC is essentially internal-only.
+
+---
+
+### Side-by-Side Comparison
+
+With that context, the trade-off table:
+
+| Dimension | REST | GraphQL | gRPC |
+|-----------|------|---------|------|
+| Protocol | HTTP/1.1+ | HTTP/1.1+ | HTTP/2 (required) |
+| Format | JSON (text) | JSON (text) | Protobuf (binary) |
+| Schema / typing | Optional (OpenAPI/Swagger) | Mandatory (SDL schema) | Mandatory (.proto files) |
+| Browser support | Native | Native | Needs grpc-web proxy |
+| Caching | Native HTTP caching | Manual (complex, per-query) | Not native |
+| Streaming | SSE / WebSocket (external) | Subscriptions | Native 4-way streaming |
+| Overfetching | Common | None | None |
+| Learning curve | Low | Medium | High |
+| Payload size | Medium (~JSON) | Medium (~JSON) | Small (binary, ~5-10× smaller) |
+| Best for | Public APIs, simple CRUD | Complex frontends, mobile | Internal microservices |
+
+**Netflix's stack — all three in production simultaneously:** Internal microservices talk gRPC (protobuf, low latency). A GraphQL federation layer aggregates the gRPC responses into a unified graph. Older device SDKs (smart TVs, legacy consoles) hit a REST-compatible adapter in front of the GraphQL layer. Three protocols, three different client populations, zero overlap in use case.
+
+---
 
 ## Implementation
 
-_Full content coming in Phase 03._
+A RESTful Express API with versioning (`/api/v1/`), proper status codes, and a Mongoose model for a blog post resource.
+
+### The Mongoose Schema
+
+```ts
+// models/Post.ts
+import mongoose, { Document, Schema } from 'mongoose'
+
+export interface IPost extends Document {
+  title:    string
+  slug:     string
+  body:     string
+  authorId: mongoose.Types.ObjectId
+  tags:     string[]
+  status:   'draft' | 'published' | 'archived'
+  createdAt: Date
+  updatedAt: Date
+}
+
+const PostSchema = new Schema<IPost>({
+  title:    { type: String, required: true, trim: true, maxlength: 200 },
+  slug:     { type: String, required: true, unique: true, lowercase: true },
+  body:     { type: String, required: true },
+  authorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  tags:     [{ type: String, lowercase: true }],
+  status:   { type: String, enum: ['draft', 'published', 'archived'], default: 'draft' },
+}, { timestamps: true })  // ← auto-manages createdAt and updatedAt
+
+// Compound index: efficient query for "published posts by author"
+PostSchema.index({ authorId: 1, status: 1 })
+
+export default mongoose.model<IPost>('Post', PostSchema)
+```
+
+### The Controller
+
+```ts
+// controllers/posts.ts
+import { Request, Response } from 'express'
+import Post from '../models/Post'
+
+// GET /api/v1/posts  →  200 with array (empty array if nothing matches, never 404)
+export async function listPosts(req: Request, res: Response) {
+  const { status = 'published', tag, limit = '20', cursor } = req.query
+  const filter: Record<string, unknown> = { status }
+  if (tag)    filter.tags = tag
+  if (cursor) filter._id  = { $lt: cursor }  // cursor-based pagination
+
+  const posts = await Post.find(filter)
+    .sort({ _id: -1 })
+    .limit(Number(limit))
+  res.status(200).json({ data: posts, count: posts.length })
+}
+
+// POST /api/v1/posts  →  201 Created + Location header
+export async function createPost(req: Request, res: Response) {
+  const post = await Post.create({
+    ...req.body,
+    authorId: req.user.id,
+  })
+  res
+    .status(201)
+    .setHeader('Location', `/api/v1/posts/${post._id}`)
+    .json({ data: post })
+}
+
+// GET /api/v1/posts/:id  →  200 or 404
+export async function getPost(req: Request, res: Response) {
+  const post = await Post.findById(req.params.id)
+  if (!post) return res.status(404).json({ error: 'Post not found' })
+  res.status(200).json({ data: post })
+}
+
+// PATCH /api/v1/posts/:id  →  200 or 404
+// Partial update — only fields in the body are changed
+export async function updatePost(req: Request, res: Response) {
+  const post = await Post.findByIdAndUpdate(
+    req.params.id,
+    { $set: req.body },
+    { new: true, runValidators: true }  // return updated doc, run schema validators
+  )
+  if (!post) return res.status(404).json({ error: 'Post not found' })
+  res.status(200).json({ data: post })
+}
+
+// DELETE /api/v1/posts/:id  →  204 No Content (or 404)
+export async function deletePost(req: Request, res: Response) {
+  const post = await Post.findByIdAndDelete(req.params.id)
+  if (!post) return res.status(404).json({ error: 'Post not found' })
+  res.status(204).send()  // 204 = success, no body to return
+}
+```
+
+### The Routes
+
+```ts
+// routes/v1/posts.ts
+import express from 'express'
+import { listPosts, createPost, getPost, updatePost, deletePost } from '../../controllers/posts'
+import { authenticate } from '../../middleware/auth'
+import { validate } from '../../middleware/validate'
+import { CreatePostSchema, UpdatePostSchema } from '../../schemas/posts'
+
+const router = express.Router()
+
+// Public endpoints
+router.get('/',    listPosts)
+router.get('/:id', getPost)
+
+// Protected endpoints (require auth + validation)
+router.post('/',    authenticate, validate(CreatePostSchema), createPost)
+router.patch('/:id', authenticate, validate(UpdatePostSchema), updatePost)
+router.delete('/:id', authenticate, deletePost)
+
+export default router
+
+// app.ts
+app.use('/api/v1/posts', router)
+```
+
+The `/v1/` prefix costs nothing to add on day one and avoids a painful migration if you ever need a breaking change.
+
+---
 
 ## Schema
 
-_Full content coming in Phase 03._
+### Entity Relationship Diagram
+
+The three collections involved in a blog API and their relationships:
+
+<ApiErDiagram />
+
+### Request Data Flow
+
+How a `POST /api/v1/posts` request travels through the system:
+
+<ApiDataFlowDiagram />
+
+---
 
 ## Animations
 
-_Animations coming in Phase 03._
+### Animation 1 — REST Request Lifecycle
+
+Step through a complete `POST /api/v1/posts` request from the client to MongoDB and back. Each step shows the exact HTTP data at that layer and why each middleware exists.
+
+<RestRequestFlow />
+
+### Animation 2 — HTTP Methods Explorer
+
+Select any HTTP method to see its safety and idempotency properties, when to use it, and a real request/response example. The most common source of wrong API design is reaching for POST when PUT, PATCH, or DELETE is correct.
+
+<HttpMethodsExplorer />
+
+### Animation 3 — Overfetching: REST vs GraphQL
+
+Scenario: render a navbar that needs only `name` and `avatarUrl`. See how much data REST vs GraphQL transfers for this exact requirement. This is why GitHub moved their primary developer API from REST v3 to GraphQL v4.
+
+<OverfetchingComparative />
+
+### Animation 4 — Status Code Failure Mode
+
+The single most common REST API mistake: returning `200 OK` when the operation failed. See every layer of the stack that breaks silently when you bury errors in a 200 response body — monitoring, retry logic, CDN caching, and client error handling.
+
+<StatusCodeSimulator />
+
+---
 
 ## Common Mistakes
 
-_Full content coming in Phase 03._
+1. **Using POST for everything.** Many developers default to POST for all writes because it always works. But GET should be used for reads (responses are cacheable), PUT/PATCH for updates (they signal idempotency to clients and infrastructure), DELETE for removal. An endpoint like `POST /delete-user/123` is not RESTful, cannot be retried safely by idempotent-aware middleware, and confuses every API consumer.
+
+2. **Returning `200 OK` for errors.** Responding with `{"status": "error", "message": "not found"}` and HTTP 200 is inherited from SOAP/XML-RPC traditions. In REST, the HTTP status code is the primary signal for every layer in the stack — CDN caches, retry middleware, monitoring dashboards, and SDK error handling all read it first. Burying errors in a 200 body makes monitoring think your API has 0% error rate while users see failures.
+
+3. **Confusing PUT and PATCH.** PUT is a full replacement — any field you omit in the body gets deleted or reset. PATCH is a partial update — only the fields you send are modified. Accidentally using PUT when you mean PATCH causes silent data loss: a client that sends `PUT {"status": "published"}` will wipe out `title`, `body`, `tags`, and every other field it didn't include.
+
+4. **Not versioning from day one.** Adding `/v1/` after you have external consumers requires a coordinated migration across every client simultaneously. Adding it on day one is free — even if you never ship v2, it preserves the option. Stripe has kept `/v1/` for over 10 years and used the `Stripe-Version` header for breaking changes without ever forcing a URL migration.
+
+5. **Ignoring idempotency for retries.** In any distributed system, a POST request can be sent twice — network timeout before the response arrives, user double-clicks a submit button. Without an idempotency mechanism (a client-provided `Idempotency-Key` header stored server-side, as Stripe does), you create duplicate orders, charges, or records. Any endpoint that creates a resource or triggers a payment must have an idempotency strategy.
+
+6. **Omitting the `Location` header on 201 responses.** RFC 9110 specifies that `201 Created` responses SHOULD include a `Location` header with the URL of the new resource. Omitting it forces clients to either hard-code URL construction logic (`/api/v1/posts/` + response._id) or make a second GET request to discover the URL. The header is one line; the tight coupling it prevents is permanent.
+
+---
 
 ## Interview Prep
 
-_Full content coming in Phase 03._
+### Sample FAANG Question
+
+> "Design the API for a URL shortener service. What endpoints, HTTP methods, and status codes would you use? How do you handle versioning and duplicate submissions?"
+
+### Structured Answer
+
+**Step 1: Identify the resources**
+
+"There are two resources: `ShortLink` (the mapping) and `Redirect` (the actual redirect). I'd separate them:
+
+```
+POST   /api/v1/links             → 201 + Location: /api/v1/links/:code
+GET    /api/v1/links/:code       → 200 with metadata (original URL, click count)
+DELETE /api/v1/links/:code       → 204 No Content
+GET    /:code                    → 301 or 302 redirect
+```
+
+The redirect endpoint lives at the root (`/:code`) because short URLs must be as short as possible."
+
+**Step 2: 301 vs 302 for the redirect**
+
+"The key trade-off is 301 Permanent vs 302 Temporary. 301 gets cached by browsers and CDNs — every repeat visit goes directly to the destination without hitting our servers. But once cached, we cannot change the destination or track clicks (the browser never calls us again). 302 Temporary keeps us in the request loop for every visit — we can count clicks, change the destination, and disable the link. For a analytics-heavy product like Bitly, 302. For pure performance with no analytics requirement, 301."
+
+**Step 3: Versioning**
+
+"URI versioning from day one: `/api/v1/`. Even if this is an internal-only API today, adding the prefix costs nothing and preserves the option to break backward compatibility later."
+
+**Step 4: Idempotency for duplicate submissions**
+
+"If the network drops after a client POSTs but before they receive the 201, they'll re-POST and create a duplicate short link. I'd accept an `Idempotency-Key: <uuid>` header on POST — store the key in Redis for 24 hours and return the original response for duplicate keys. This is the same pattern Stripe uses for all financial operations."
+
+### Back-of-the-Envelope
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| Read:Write ratio (URL shortener) | 100:1 | Reads (redirects) massively dominate writes (link creation) |
+| Write QPS | ~100/s | Roughly 10M new links/day ÷ 86,400s |
+| Read QPS (redirects) | ~10,000/s | 100× the write rate |
+| Avg redirect response size | ~0B body | Just headers (301/302 with Location) |
+| Avg metadata response size | ~256B | JSON with shortCode + originalUrl + stats |
+| Read bandwidth | ~2.5 MB/s | 10K × 256B metadata reads |
+| Storage per link | ~500B | shortCode + originalUrl + userId + timestamps |
+| Storage (5 years, 100 writes/s) | ~7.5 GB | 100/s × 86,400 × 365 × 5 × 500B |
+| Cache hit rate target | 95%+ | Redirect mappings change rarely — cache aggressively |
+
+### Follow-up Questions to Expect
+
+- *"What is the difference between idempotent and safe? Name an example of an operation that is idempotent but not safe."*
+- *"When would you choose GraphQL over REST? What problem does it solve that REST doesn't?"*
+- *"How does gRPC achieve lower latency than REST, and what is the trade-off?"*
+- *"How does Stripe handle API versioning across a decade without breaking existing integrations?"*
+- *"What is HATEOAS and does anyone actually implement it?"*
+- *"Why do we say 401 is about authentication and 403 is about authorization? What triggers each?"*
+- *"If a client POSTs a request and the network drops before the response arrives, what happens? How do you design for this?"*

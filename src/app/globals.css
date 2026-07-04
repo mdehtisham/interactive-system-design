@@ -116,6 +116,15 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* html + body must be exactly viewport-height and non-scrollable.
+   Only <main> (overflow-y-auto) should ever produce a scrollbar.
+   Without this, the browser renders its native page scrollbar alongside
+   the inner scroll container, producing two simultaneous scrollbars. */
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
