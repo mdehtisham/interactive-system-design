@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useUIStore } from '@/store/uiStore'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { ChevronRight, Home } from 'lucide-react'
@@ -28,7 +27,7 @@ interface NavProps {
 
 function SidebarNav({ pathname, onNavigate }: NavProps) {
   return (
-    <ScrollArea className="flex-1">
+    <div className="flex-1 overflow-y-auto">
       <nav className="p-2">
         {/* Home link */}
         <Link
@@ -92,7 +91,7 @@ function SidebarNav({ pathname, onNavigate }: NavProps) {
           )
         })}
       </nav>
-    </ScrollArea>
+    </div>
   )
 }
 
