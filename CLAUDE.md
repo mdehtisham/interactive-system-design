@@ -337,6 +337,58 @@ Follow the sequence in `TOPICS.md` exactly — the prerequisite chain is the imp
 
 ---
 
+## Interview Prep Standards
+
+Every Interview Prep section **must** meet these standards before a topic is marked complete. These rules exist because wrong numbers or missing core challenges are immediately disqualifying in a real FAANG interview.
+
+### Back-of-the-Envelope — Math Rules (Non-Negotiable)
+
+**Always verify arithmetic step by step. Never write a storage or bandwidth number from memory.** The Notes column must show the derivation, not just the result.
+
+**Storage estimation template:**
+
+```
+writes_per_second × 86,400 s/day × 365 days × years × bytes_per_record
+```
+
+**Worked example — URL shortener, 100 writes/s, 5 years, 500 bytes/record:**
+
+```
+100 × 86,400 × 365 × 5 = 15,768,000,000 total records
+15,768,000,000 × 500 bytes = 7,884,000,000,000 bytes ≈ 7.9 TB
+```
+
+The most common error: confusing GB and TB (factor of 1,000). Always compute; never estimate.
+
+### Structured Answer — Core Engineering Challenge
+
+Every FAANG system design answer must proactively address the **core engineering challenge** of the topic — the one thing interviewers always probe — even if the question does not explicitly ask. Raising it unprompted signals depth and separates a 7/10 answer from a 10/10.
+
+**Known core challenges per common design question:**
+
+| Design question | Core challenge to always address |
+|---|---|
+| URL shortener | Short code generation: base62 + sequential ID vs MD5-truncated; Snowflake IDs for multi-server uniqueness; collision handling |
+| Rate limiter | Algorithm choice: token bucket vs sliding window log vs sliding window counter; where state lives (Redis vs in-process); race condition on distributed decrement |
+| Chat / messaging | Message delivery guarantee: at-most-once vs at-least-once vs exactly-once; fan-out strategy for group chats; online/offline presence |
+| Search autocomplete | Trie vs inverted index; where prefix cache lives; freshness vs latency trade-off; top-K ranking |
+| Notification system | Push vs pull; fan-out-on-write vs fan-out-on-read; celebrity problem (a user with 100M followers posts) |
+| CDN | Cache invalidation: TTL vs event-driven purge; cache miss thundering herd; origin shield pattern |
+| Key-value store | Consistency model: eventual vs strong; conflict resolution (last-write-wins vs vector clocks); partition tolerance |
+
+Expand this table as new topics are implemented.
+
+### "How the Web Works" Type Questions — Four Details That Separate 10/10 Answers
+
+When any interview question involves DNS → TCP → TLS → HTTP → render, always include all four of these — they are the details most candidates miss:
+
+1. **HSTS preload list** — Before DNS, the browser checks a hardcoded list. `google.com`, `youtube.com`, etc. are on it. The browser forces HTTPS and never attempts HTTP — even on first visit. This eliminates the otherwise-inevitable HTTP → 301 round trip.
+2. **HTTP/2 stream multiplexing vs HTTP/1.1 head-of-line blocking** — Don't just say "parallel requests." Explain that HTTP/1.1 serialises requests on each TCP connection (browsers open 6–8 connections to compensate), while HTTP/2 multiplexes independent streams over one connection with zero queueing between streams.
+3. **TLS 1.3 0-RTT resumption** — Returning visitors with a valid session ticket send application data inside the ClientHello — TLS adds zero extra round trips. Mention this when discussing TTFB optimisation.
+4. **Service workers for returning users** — A registered service worker intercepts the fetch before any network contact, serving from Cache Storage API. Zero DNS, zero TCP, zero TTFB. This is why PWAs load in single-digit milliseconds on repeat visits.
+
+---
+
 ## Topic Tagging System
 
 Every topic in `TOPICS.md` carries internal tags. These are the source of truth for generating learning paths — **never hardcode topic lists into UI components**; always derive them from tags at runtime.

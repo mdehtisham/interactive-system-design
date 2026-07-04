@@ -704,44 +704,57 @@ The single most common REST API mistake: returning `200 OK` when the operation f
 
 ### Structured Answer
 
-**Step 1: Identify the resources**
+**Step 1: Identify the resources and endpoints**
 
-"There are two resources: `ShortLink` (the mapping) and `Redirect` (the actual redirect). I'd separate them:
+"There are two primary resources: `ShortLink` (the mapping) and the redirect itself. I'd design:
 
 ```
 POST   /api/v1/links             → 201 + Location: /api/v1/links/:code
-GET    /api/v1/links/:code       → 200 with metadata (original URL, click count)
+GET    /api/v1/links/:code       → 200 with metadata (originalUrl, clickCount, expiresAt)
 DELETE /api/v1/links/:code       → 204 No Content
-GET    /:code                    → 301 or 302 redirect
+GET    /:code                    → 301 or 302 redirect to originalUrl
 ```
 
-The redirect endpoint lives at the root (`/:code`) because short URLs must be as short as possible."
+The redirect endpoint lives at the root — short URLs must be as short as possible. The management API lives under `/api/v1/` so it can version independently."
 
-**Step 2: 301 vs 302 for the redirect**
+**Step 2: Short code generation — the core engineering challenge**
 
-"The key trade-off is 301 Permanent vs 302 Temporary. 301 gets cached by browsers and CDNs — every repeat visit goes directly to the destination without hitting our servers. But once cached, we cannot change the destination or track clicks (the browser never calls us again). 302 Temporary keeps us in the request loop for every visit — we can count clicks, change the destination, and disable the link. For a analytics-heavy product like Bitly, 302. For pure performance with no analytics requirement, 301."
+"Before finalising the endpoints, I want to address how short codes are generated — this is the heart of the problem. Three approaches:
 
-**Step 3: Versioning**
+**Option A — Base62 encoding of a sequential ID (my recommendation for production).** Base62 uses digits + lowercase + uppercase = 62 characters. 7 characters gives 62^7 ≈ 3.5 trillion unique codes — sufficient for centuries of growth at any realistic write rate. The sequential ID comes from a database auto-increment for a single write server, or a **Snowflake-style distributed ID** (64-bit integer embedding a timestamp, machine ID, and per-machine sequence number) for multi-write-server setups. Zero collision risk, no pre-check required.
 
-"URI versioning from day one: `/api/v1/`. Even if this is an internal-only API today, adding the prefix costs nothing and preserves the option to break backward compatibility later."
+**Option B — MD5-truncated to 7 characters.** Hash the long URL + a salt, take the first 7 characters. Identical long URLs map to the same short code, giving deduplication for free. But you need a uniqueness check DB read before every write, plus a retry loop for the rare collision.
 
-**Step 4: Idempotency for duplicate submissions**
+**Option C — Random alphanumeric string.** Simple to implement, requires a uniqueness check and retry. No deduplication benefit.
 
-"If the network drops after a client POSTs but before they receive the 201, they'll re-POST and create a duplicate short link. I'd accept an `Idempotency-Key: <uuid>` header on POST — store the key in Redis for 24 hours and return the original response for duplicate keys. This is the same pattern Stripe uses for all financial operations."
+I'd choose Option A for a system with high write throughput and use Snowflake IDs to scale across write servers without coordination."
+
+**Step 3: 301 vs 302 for the redirect**
+
+"The key trade-off is 301 Permanent vs 302 Temporary. 301 gets cached by browsers and CDNs permanently — every repeat visit goes directly to the destination without touching our servers. Speed is maximised, server load is minimised. But once cached, we cannot change the destination, disable the link, or count that click — the browser never calls us again. 302 Temporary keeps us in the request path for every visit — we can update the destination, disable the link, and increment click counts in real time. For an analytics product like Bitly, 302 is the only viable choice. For pure URL forwarding with no analytics requirement, 301."
+
+**Step 4: Versioning**
+
+"URI versioning from day one: `/api/v1/`. Even if this is internal-only today, it costs nothing to add and preserves the right to make breaking changes later without forcing a coordinated migration across all clients."
+
+**Step 5: Idempotency for duplicate submissions**
+
+"If the network drops after a `POST /api/v1/links` but before the client receives the 201, the client will retry — creating a duplicate short link. I'd accept an `Idempotency-Key: <uuid>` header on `POST`, store the key-to-response mapping in Redis with a 24-hour TTL, and return the original `201` response for any duplicate key — including the same `Location` header pointing to the original short code. This is the same pattern Stripe uses for all financial operations to guarantee exactly-once semantics across retries."
 
 ### Back-of-the-Envelope
 
 | Metric | Value | Notes |
 |--------|-------|-------|
-| Read:Write ratio (URL shortener) | 100:1 | Reads (redirects) massively dominate writes (link creation) |
-| Write QPS | ~100/s | Roughly 10M new links/day ÷ 86,400s |
+| Read:Write ratio | 100:1 | Reads (redirects) massively dominate writes (link creation) |
+| Write QPS | ~100/s | Roughly 8.6M new links/day ÷ 86,400s |
 | Read QPS (redirects) | ~10,000/s | 100× the write rate |
-| Avg redirect response size | ~0B body | Just headers (301/302 with Location) |
-| Avg metadata response size | ~256B | JSON with shortCode + originalUrl + stats |
-| Read bandwidth | ~2.5 MB/s | 10K × 256B metadata reads |
-| Storage per link | ~500B | shortCode + originalUrl + userId + timestamps |
-| Storage (5 years, 100 writes/s) | ~7.5 GB | 100/s × 86,400 × 365 × 5 × 500B |
-| Cache hit rate target | 95%+ | Redirect mappings change rarely — cache aggressively |
+| Avg redirect response size | ~0B body | Just headers (301/302 with Location) — no body |
+| Avg metadata response size | ~256B | JSON with shortCode + originalUrl + clickCount + stats |
+| Read bandwidth | ~2.5 MB/s | 10K QPS × 256B (metadata reads only; redirects are header-only) |
+| Storage per link | ~500B | shortCode + originalUrl + userId + timestamps + clickCount |
+| **Storage (5 years, 100 writes/s)** | **~7.9 TB** | 100 × 86,400 × 365 × 5 = 15.77B links × 500B = ~7.9 TB |
+| Short code length | 7 chars (base62) | 62^7 ≈ 3.5 trillion unique codes — no collision risk for decades |
+| Cache hit rate target | 95%+ | Redirect mappings rarely change — cache in Redis; at 10K QPS reads, 95% hit rate means only ~500 QPS reaches the DB |
 
 ### Follow-up Questions to Expect
 
