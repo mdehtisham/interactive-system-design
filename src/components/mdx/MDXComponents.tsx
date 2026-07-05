@@ -23,6 +23,7 @@ import { StatusCodeSimulator } from '@/components/animations/topics/StatusCodeSi
 // Topic 02: APIs & REST — diagrams
 import { ApiErDiagram } from '@/components/diagrams/ApiErDiagram'
 import { ApiDataFlowDiagram } from '@/components/diagrams/ApiDataFlowDiagram'
+import { ApiSystemFlowDiagram } from '@/components/diagrams/ApiSystemFlowDiagram'
 
 /**
  * Converts any string to a URL-safe anchor ID.
@@ -198,4 +199,5 @@ export const mdxComponents: MDXComponents = {
   // ── Topic 02: APIs & REST — diagrams ──────────────────────────────────────
   ApiErDiagram,
   ApiDataFlowDiagram,
+  ApiSystemFlowDiagram,
 }

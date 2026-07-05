@@ -66,6 +66,17 @@ reproduce the exact same bugs in new components.
   string contains `{` or `}`. MDX's JSX parser treats `{` as a JS expression
   boundary, delivering `undefined` as the prop. Always put chart strings in a
   TypeScript wrapper component as a module-level `const`.
+- **Never** write a Mermaid diagram as a fenced code block (` ```mermaid `) in
+  MDX. Fenced code blocks render as a plain `<code>` element — the diagram is
+  never parsed or drawn. Every Mermaid diagram must be a named component in
+  `src/components/diagrams/` that wraps `<MermaidDiagram chart={CHART} />`,
+  with the chart string as a module-level `const`. The component is then
+  referenced in MDX as `<MyDiagramName />` with no inline string.
+- **Every new diagram or animation component used in MDX must be registered in
+  `src/components/mdx/MDXComponents.tsx`** — both an `import` line at the top
+  and an entry in the `mdxComponents` object. Omitting either causes a 500
+  error: "Expected component `X` to be defined." Always update this file
+  immediately after creating a new component, before testing in the browser.
 
 ### Tooltips and Popovers
 
@@ -239,18 +250,28 @@ If a user lands on a topic they aren't ready for, the prerequisites block is the
 
 2. **FAANG Concept Deep-Dive** — explain the concept in the context of large-scale distributed systems (e.g., how Netflix uses caching, how Google handles sharding). Reference real systems by name.
 
-3. **Next.js Implementation** — working code demonstrating the pattern in this app (API route, server component, or client component as appropriate).
+3. **`## Implementation`** — the LLD section. Three required sub-sections, always in this order:
 
-4. **Database & API Schema** — Mongoose model + Express/Next.js controller endpoints, plus:
-   - **Mermaid ER diagram** showing all collections/tables involved, their fields, and the relationships between them (foreign keys, embedded docs, references). Example:
-     ```
-     erDiagram
-       USER ||--o{ SESSION : has
-       SESSION ||--|{ REQUEST : logs
-       USER { string id, string email }
-       SESSION { string id, string userId, date createdAt }
-     ```
-   - **Data flow diagram** — a separate Mermaid flowchart tracing exactly how a request reads/writes through these schemas step by step (e.g., `API Route → check cache → query DB → write result to cache → return response`).
+   **`### Schema Design`** — Mongoose model with its TypeScript interface (`IModelName extends Document`). Every field explained inline: why it exists, its type, its constraints. Indexes declared at the model level with a one-line comment stating which query they serve. For foundational topics with no application DB model (e.g., How the Web Works), this sub-section is omitted — the Schema section's Entity Relationships diagram serves as the data structure reference instead.
+
+   **LLD layering — always apply this pattern:**
+   ```
+   Route (express.Router)  →  maps URL + HTTP verb to a controller function
+   Controller (thin)       →  parse req, call service, return res; zero business logic
+   Service (/lib)          →  business logic, validation, DB calls; testable in isolation
+   Model (Mongoose)        →  schema + TypeScript types only; zero business logic
+   ```
+   Apply Single Responsibility throughout: one file, one concern. Controllers that contain conditional logic or DB calls directly are doing too much — move that to the service layer.
+
+   **`### API Contract`** — Express controller functions (one per HTTP verb) with correct status codes, error branches, and response shapes. Followed by the router file showing the URL → middleware → controller chain.
+
+   **`### Data Flow`** — a Mermaid flowchart component tracing one complete real request (e.g., `POST /api/v1/posts`) through every code layer: client → route → middleware → controller → service → model → DB → response. Every arrow labelled. Shows the happy path and the first failure branch (e.g., 404 on DB miss).
+
+4. **`## Schema`** — visual companions to the Implementation section. Two required sub-sections:
+
+   **`### Entity Relationships`** — Mermaid ER diagram via a named component (e.g., `<ApiErDiagram />`). Every collection, every field, and every relationship shown with cardinality and embed-vs-reference decision annotated.
+
+   **`### Request Data Flow`** — Mermaid data-flow diagram component showing the same request as Implementation's Data Flow, but at the infrastructure level (CDN → LB → service → cache → DB) rather than the code-function level. The two views complement each other: Implementation shows the code path; Schema shows the system path.
 
 5. **Visual Aids & Animations (maximum coverage required):**
 
@@ -425,3 +446,22 @@ When adding a new topic, assign all tags before writing any code. The tags in `T
 - Diagram strings follow Mermaid syntax and are co-located with the component that renders them (not in a separate data file).
 - Animation components receive plain data props; no animation logic inside page files.
 - All trade-off comparisons are rendered as Markdown tables, not as JSX tables, so they remain readable in source.
+
+### LLD Sub-Section Heading Names (enforced across all topics)
+
+Every `## Implementation` section must use exactly these sub-headings, in this order:
+
+| Sub-heading | Content |
+|---|---|
+| `### Schema Design` | Mongoose model + TypeScript interface + index declarations. Omit only for foundational topics with no DB model. |
+| `### API Contract` | Controller functions (one per HTTP verb) + router wiring file |
+| `### Data Flow` | Mermaid flowchart component — code-level request path |
+
+Every `## Schema` section must use exactly these sub-headings:
+
+| Sub-heading | Content |
+|---|---|
+| `### Entity Relationships` | Mermaid ER diagram component |
+| `### Request Data Flow` | Mermaid infrastructure-level flow component |
+
+Non-conforming sub-heading names ("The Mongoose Schema", "The Controller", "Entity Relationship Diagram") are wrong. Fix them when you touch a file.

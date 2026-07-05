@@ -65,6 +65,8 @@ Most DNS queries use **UDP** (connectionless, stateless, 1 packet) because the o
 
 ## Implementation
 
+### How It Works in Code
+
 The best way to make HTTP concrete is to see what a server actually receives when you make a request. Here is a Next.js App Router API route that reflects every HTTP detail back to the caller — method, URL, real client IP, headers, and timestamp.
 
 ```ts
@@ -119,13 +121,19 @@ Example response — every field is the actual HTTP request your browser or `cur
 
 ## Schema
 
+### Entity Relationships
+
 DNS does not have a traditional database schema, but its record types map directly to one. Each DNS record is a row with a type, a name, a value, and an expiry.
 
 <DnsErDiagram />
 
+### Resolution Path
+
 The full DNS resolution path from browser to IP, step by step:
 
 <DnsResolutionDiagram />
+
+### Request Data Flow
 
 The full request lifecycle from URL typed to pixels on screen:
 

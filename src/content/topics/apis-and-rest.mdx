@@ -506,7 +506,7 @@ With that context, the trade-off table:
 | Payload size | Medium (~JSON) | Medium (~JSON) | Small (binary, ~5-10× smaller) |
 | Best for | Public APIs, simple CRUD | Complex frontends, mobile | Internal microservices |
 
-**Netflix's stack — all three in production simultaneously:** Internal microservices talk gRPC (protobuf, low latency). A GraphQL federation layer aggregates the gRPC responses into a unified graph. Older device SDKs (smart TVs, legacy consoles) hit a REST-compatible adapter in front of the GraphQL layer. Three protocols, three different client populations, zero overlap in use case.
+**Netflix's stack — all three in production simultaneously:** Internal microservices talk gRPC (protobuf, low latency). A GraphQL federation layer aggregates the gRPC responses into a unified graph. Older device SDKs (smart TVs, legacy consoles) hit a REST-compatible adapter in front of the GraphQL layer.
 
 ---
 
@@ -514,7 +514,7 @@ With that context, the trade-off table:
 
 A RESTful Express API with versioning (`/api/v1/`), proper status codes, and a Mongoose model for a blog post resource.
 
-### The Mongoose Schema
+### Schema Design
 
 ```ts
 // models/Post.ts
@@ -546,7 +546,7 @@ PostSchema.index({ authorId: 1, status: 1 })
 export default mongoose.model<IPost>('Post', PostSchema)
 ```
 
-### The Controller
+### API Contract
 
 ```ts
 // controllers/posts.ts
@@ -605,7 +605,7 @@ export async function deletePost(req: Request, res: Response) {
 }
 ```
 
-### The Routes
+### Route Wiring
 
 ```ts
 // routes/v1/posts.ts
@@ -634,11 +634,17 @@ app.use('/api/v1/posts', router)
 
 The `/v1/` prefix costs nothing to add on day one and avoids a painful migration if you ever need a breaking change.
 
+### Data Flow
+
+How a `POST /api/v1/posts` request travels through every code layer — from the incoming HTTP request to the MongoDB write and back:
+
+<ApiDataFlowDiagram />
+
 ---
 
 ## Schema
 
-### Entity Relationship Diagram
+### Entity Relationships
 
 The three collections involved in a blog API and their relationships:
 
@@ -646,9 +652,9 @@ The three collections involved in a blog API and their relationships:
 
 ### Request Data Flow
 
-How a `POST /api/v1/posts` request travels through the system:
+The same `POST /api/v1/posts` request at the infrastructure level — how it moves through the system's components before any application code runs:
 
-<ApiDataFlowDiagram />
+<ApiSystemFlowDiagram />
 
 ---
 
