@@ -7,6 +7,8 @@ import { useTheme } from 'next-themes'
 interface Props {
   chart: string
   caption?: string
+  /** Set to false to hide the fullscreen button (e.g. ER diagrams that are already readable inline). */
+  fullscreen?: boolean
 }
 
 function ExpandIcon() {
@@ -73,7 +75,7 @@ function CollapseIcon() {
  * constraint is removed for the fullscreen copy so it scales to fill the
  * available viewport width via its viewBox.
  */
-export function MermaidDiagram({ chart, caption }: Props) {
+export function MermaidDiagram({ chart, caption, fullscreen = true }: Props) {
   const { resolvedTheme } = useTheme()
   const svgContainerRef      = useRef<HTMLDivElement>(null)
   const fullscreenContainerRef = useRef<HTMLDivElement>(null)
@@ -240,8 +242,8 @@ export function MermaidDiagram({ chart, caption }: Props) {
       {/* ── Inline diagram container ──────────────────────────────────────── */}
       <div className="relative overflow-x-auto rounded-lg border border-border bg-transparent p-4">
 
-        {/* Fullscreen expand button — only appears once the SVG is ready */}
-        {svgContent && !error && (
+        {/* Fullscreen expand button — only appears once the SVG is ready and fullscreen is enabled */}
+        {fullscreen && svgContent && !error && (
           <button
             ref={expandBtnRef}
             type="button"

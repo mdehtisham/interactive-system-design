@@ -23,6 +23,7 @@ export function DnsErDiagram() {
     <MermaidDiagram
       chart={CHART}
       caption="DNS records are the rows of the internet's distributed database — each maps a name to a value with an expiry (TTL). The type field holds A, AAAA, CNAME, MX, TXT, or NS."
+      fullscreen={false}
     />
   )
 }

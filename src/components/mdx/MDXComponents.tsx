@@ -24,6 +24,9 @@ import { StatusCodeSimulator } from '@/components/animations/topics/StatusCodeSi
 import { ApiErDiagram } from '@/components/diagrams/ApiErDiagram'
 import { ApiDataFlowDiagram } from '@/components/diagrams/ApiDataFlowDiagram'
 import { ApiSystemFlowDiagram } from '@/components/diagrams/ApiSystemFlowDiagram'
+// Interview Q&A accordion wrappers — one per topic
+import { HowTheWebWorksQA } from '@/components/interview/topics/HowTheWebWorksQA'
+import { ApisAndRestQA } from '@/components/interview/topics/ApisAndRestQA'
 
 /**
  * Converts any string to a URL-safe anchor ID.
@@ -200,4 +203,8 @@ export const mdxComponents: MDXComponents = {
   ApiErDiagram,
   ApiDataFlowDiagram,
   ApiSystemFlowDiagram,
+
+  // ── Interview Q&A accordions (one wrapper per topic) ───────────────────────
+  HowTheWebWorksQA,
+  ApisAndRestQA,
 }

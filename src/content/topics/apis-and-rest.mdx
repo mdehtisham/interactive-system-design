@@ -762,12 +762,8 @@ I'd choose Option A for a system with high write throughput and use Snowflake ID
 | Short code length | 7 chars (base62) | 62^7 ≈ 3.5 trillion unique codes — no collision risk for decades |
 | Cache hit rate target | 95%+ | Redirect mappings rarely change — cache in Redis; at 10K QPS reads, 95% hit rate means only ~500 QPS reaches the DB |
 
-### Follow-up Questions to Expect
+### Follow-up Questions
 
-- *"What is the difference between idempotent and safe? Name an example of an operation that is idempotent but not safe."*
-- *"When would you choose GraphQL over REST? What problem does it solve that REST doesn't?"*
-- *"How does gRPC achieve lower latency than REST, and what is the trade-off?"*
-- *"How does Stripe handle API versioning across a decade without breaking existing integrations?"*
-- *"What is HATEOAS and does anyone actually implement it?"*
-- *"Why do we say 401 is about authentication and 403 is about authorization? What triggers each?"*
-- *"If a client POSTs a request and the network drops before the response arrives, what happens? How do you design for this?"*
+Think through your answer before revealing it — active recall produces significantly stronger retention than reading a model answer passively.
+
+<ApisAndRestQA />

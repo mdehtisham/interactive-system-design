@@ -39,6 +39,7 @@ export function ApiErDiagram() {
     <MermaidDiagram
       chart={CHART}
       caption="A blog API schema: one User writes many Posts, each Post has many Comments, each Comment belongs to both a Post and a User (author). The slug field is a URL-safe unique identifier — e.g. 'rest-apis-explained' — so resources are addressable by name without exposing internal ObjectIds."
+      fullscreen={false}
     />
   )
 }

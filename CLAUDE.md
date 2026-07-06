@@ -323,6 +323,22 @@ If a user lands on a topic they aren't ready for, the prerequisites block is the
 
 7. **Interview Prep** — FAANG-style answer outline including back-of-the-envelope estimation (QPS, storage, bandwidth). Include a sample question and a structured answer template.
 
+   **Follow-up Questions — required format (non-negotiable):**
+   Never write follow-up questions as a plain bullet list. Every topic must end its Interview Prep section with an `<InterviewQAAccordion>` powered by a topic-specific wrapper component. Each question must have all four fields:
+
+   ```ts
+   {
+     question: string   // exactly as an interviewer would ask it
+     intent:   string   // one sentence: what the interviewer is actually probing for
+     answer:   string   // the model answer — what a 10/10 FAANG response sounds like
+     trap?:    string   // the specific mistake most candidates make on this question
+   }
+   ```
+
+   The wrapper component lives in `src/components/interview/topics/<TopicName>QA.tsx` with the data as a module-level `const ITEMS: QAItem[]`. Register it in `MDXComponents.tsx`. Reference it in the MDX file as `<TopicNameQA />` after the instruction "Think through your answer before revealing it."
+
+   Rationale: a plain bullet list of questions is useless for learning — the candidate reads the question, has no way to self-assess, and moves on with zero retention. The accordion enforces active recall (candidate thinks before revealing), surfaces the interviewer's hidden intent, provides a model answer to calibrate against, and highlights the specific trap that eliminates most candidates.
+
 ---
 
 ## Implementation Workflow (One Topic at a Time)
