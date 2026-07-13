@@ -1,6 +1,6 @@
 ---
 title: Content Delivery Networks (CDN)
-description: Edge nodes, cache-hit vs miss, pull vs push CDNs, and how CDNs slash latency for global users.
+description: Edge nodes, Points of Presence, cache hit/miss mechanics, and how Netflix delivers 60 Tbps to 238M subscribers without destroying their origin.
 order: 3
 cluster: web-foundations
 difficulty: medium
@@ -10,30 +10,335 @@ prerequisites:
   - apis-and-rest
 ---
 
+## Prerequisites
+
+- [How the Web Works](/topics/how-the-web-works) — CDN routing uses the same DNS and TCP foundations covered there; GeoDNS routes users to the nearest PoP before any HTTP request is made.
+- [APIs & REST](/topics/apis-and-rest) — CDN cache keys are URLs; HTTP response headers (`Cache-Control`, `ETag`, `Vary`) are the control plane for edge caching behaviour.
+
+---
+
 ## ELI5 Foundation
 
-_Full content coming in Phase 03._
+Imagine your favourite book is published in a single warehouse in New York. Every time someone anywhere in the world wants to read it, the warehouse has to send a courier to deliver a copy. For someone in Sydney, that courier flies 16,000 km — which takes a whole day.
+
+Now imagine the publisher opens a branch library in every major city. The first person in Sydney to ask for the book, the branch fetches it from New York once. After that, every person in Sydney gets it from the local branch — a five-minute walk instead of a day's flight.
+
+A **Content Delivery Network** is that branch library network. Instead of one central server ("the origin"), a CDN has hundreds of servers spread around the world — one near every major city. Each city server is called an **Edge Node**, and the city it sits in is called a **Point of Presence (PoP)**.
+
+The first visitor from your city causes the edge to fetch the file from origin — that's a **cache miss**. Every subsequent visitor in your city gets it from the edge — that's a **cache hit**. The edge decides how long to keep its local copy before checking origin for updates: that countdown timer is the **TTL** (Time to Live).
+
+---
 
 ## Big Tech Deep-Dive
 
-_Full content coming in Phase 03._
+### Cloudflare and the Modern CDN
+
+Cloudflare operates the world's most widely-used CDN, with over **330 Points of Presence** across 120+ countries. Every PoP runs the same software stack, so any edge handles any request identically. At peak, Cloudflare processes over **46 million HTTP requests per second** globally — roughly 13% of all HTTP traffic on the internet.
+
+Cloudflare terminates TLS at the edge: the user connects via HTTPS to the nearest PoP, and the CDN's backbone forwards the request to origin over a separate TLS connection. This means HTTP/2 and HTTP/3 (QUIC) are negotiated between user and edge even if the origin only speaks HTTP/1.1 — the CDN protocol-upgrades transparently.
+
+### Netflix Open Connect — Why Netflix Built Its Own CDN
+
+Netflix accounts for approximately **15% of all global internet downstream traffic** at peak. With 238M subscribers and roughly 15M concurrent streams at prime time, the bandwidth demand hits **60 Tbps**. Running that through cloud egress pricing would cost approximately **$50M/day**.
+
+Netflix's answer was **Open Connect**: a proprietary CDN built on purpose-built storage appliances that Netflix ships directly into ISP data centres. The appliances hold Netflix's most popular content and handle roughly **95% of Netflix traffic without touching Netflix's own data centres**. The ISPs host the hardware for free because it dramatically reduces their upstream transit costs — popular Netflix content is served from within their own network instead of pulling from AWS.
+
+The appliances are pre-positioned: Netflix runs prediction algorithms to determine which content will be popular in each region the following day, and pushes those titles overnight when traffic is low.
+
+### Pull CDN vs Push CDN
+
+| | Pull CDN | Push CDN |
+|---|---|---|
+| **How it works** | Edge fetches from origin on first miss, then caches | Publisher proactively pushes content to every edge PoP before requests arrive |
+| **Cold start** | First user at each PoP pays origin round-trip latency | Zero — content already at edge |
+| **Storage overhead** | Edges store only what is requested | Publisher must push to every PoP upfront regardless of regional demand |
+| **Invalidation** | Controlled by TTL or CDN purge API | Publisher must push updates to every PoP |
+| **Best for** | Websites, APIs, long-tail content | Content with massive simultaneous global demand: popular videos, OS updates, game patches |
+| **Example** | Cloudflare, Fastly, Akamai (default) | Netflix Open Connect for top-10% titles |
+
+### Cache-Control: The Control Plane for Edge Caching
+
+Every HTTP response can carry a `Cache-Control` header that instructs CDN edges exactly how to handle caching:
+
+```http
+Cache-Control: public, s-maxage=604800, max-age=86400, stale-while-revalidate=60
+```
+
+- **`public`** — this response may be stored by any shared cache (CDN, proxy). Without this, only private (browser) caches apply.
+- **`s-maxage=604800`** — CDN edges cache this for 604,800 seconds (7 days). Overrides `max-age` for shared caches.
+- **`max-age=86400`** — browsers cache this for 86,400 seconds (1 day).
+- **`stale-while-revalidate=60`** — serve the stale copy for up to 60 seconds while fetching a fresh copy from origin in the background. The current user sees zero extra latency during revalidation.
+- **`no-store`** — never cache anywhere. Required for sensitive personalised responses.
+
+For versioned assets (e.g., `main.abc123.js` with a content hash baked into the filename):
+
+```http
+Cache-Control: public, max-age=31536000, immutable
+```
+
+One year, `immutable` — the browser will never revalidate. Because the filename itself changes when content changes, staleness is architecturally impossible.
+
+---
 
 ## Implementation
 
-_Full content coming in Phase 03._
+### Schema Design
+
+The LLD angle for CDN is tracking cache entry metadata — which objects are cached at which edge nodes, their TTLs, and their invalidation state. This is what a CDN provider manages internally, or what an application-layer cache-management dashboard consumes.
+
+```ts
+// models/CdnCacheEntry.ts
+import mongoose, { type InferSchemaType } from 'mongoose'
+
+const CdnCacheEntrySchema = new mongoose.Schema(
+  {
+    cacheKey:     { type: String, required: true, unique: true, index: true },
+    originUrl:    { type: String, required: true },
+    edgePopId:    { type: String, required: true },
+    contentType:  { type: String, required: true },
+    sizeBytes:    { type: Number, required: true },
+    ttlSeconds:   { type: Number, required: true },
+    etag:         { type: String },
+    staleAt:      { type: Date, required: true },
+    purgePending: { type: Boolean, default: false },
+    hitCount:     { type: Number, default: 0 },
+  },
+  { timestamps: true }
+)
+
+// Efficient lookup: "what's cached at this PoP for this cache key?"
+CdnCacheEntrySchema.index({ edgePopId: 1, cacheKey: 1 })
+
+export type CdnCacheEntry = InferSchemaType<typeof CdnCacheEntrySchema>
+export default mongoose.models.CdnCacheEntry ??
+  mongoose.model('CdnCacheEntry', CdnCacheEntrySchema)
+```
+
+### API Contract
+
+```ts
+// src/app/api/v1/cdn/purge/route.ts
+import { type NextRequest, NextResponse } from 'next/server'
+import CdnCacheEntry from '@/models/CdnCacheEntry'
+import dbConnect from '@/lib/dbConnect'
+
+// POST /api/v1/cdn/purge
+// Body: { cacheKey: string } | { urlPattern: string }
+// Returns: { purged: number }
+export async function POST(req: NextRequest) {
+  await dbConnect()
+  const body = await req.json() as { cacheKey?: string; urlPattern?: string }
+
+  if (body.cacheKey) {
+    // Exact-key invalidation: O(1) via unique index
+    const result = await CdnCacheEntry.updateOne(
+      { cacheKey: body.cacheKey },
+      { $set: { purgePending: true, staleAt: new Date() } }
+    )
+    return NextResponse.json({ purged: result.modifiedCount })
+  }
+
+  if (body.urlPattern) {
+    // Prefix/pattern purge: regex scan across the key space
+    const result = await CdnCacheEntry.updateMany(
+      { originUrl: { $regex: body.urlPattern } },
+      { $set: { purgePending: true, staleAt: new Date() } }
+    )
+    return NextResponse.json({ purged: result.modifiedCount })
+  }
+
+  return NextResponse.json(
+    { error: 'cacheKey or urlPattern required' },
+    { status: 400 }
+  )
+}
+
+// GET /api/v1/cdn/stats
+// Returns: { total: number, stale: number, hitRate: number }
+export async function GET() {
+  await dbConnect()
+  const now = new Date()
+
+  const [total, stale, hitData] = await Promise.all([
+    CdnCacheEntry.countDocuments(),
+    CdnCacheEntry.countDocuments({ staleAt: { $lt: now } }),
+    CdnCacheEntry.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalHits:  { $sum: '$hitCount' },
+          entryCount: { $sum: 1 },
+        },
+      },
+    ]),
+  ])
+
+  const totalHits  = (hitData[0]?.totalHits  as number) ?? 0
+  const entryCount = (hitData[0]?.entryCount as number) ?? 0
+  const hitRate    = entryCount > 0 ? totalHits / (totalHits + entryCount) : 0
+
+  return NextResponse.json({ total, stale, hitRate })
+}
+```
+
+### Route Wiring
+
+```ts
+// next.config.js — Cache-Control headers for all asset categories
+const nextConfig = {
+  async headers() {
+    return [
+      {
+        // Content-hashed Next.js bundles — filename changes on every build
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        // Public images — 1 week, stale-while-revalidate absorbs revalidation latency
+        source: '/images/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, s-maxage=604800, max-age=86400, stale-while-revalidate=60',
+          },
+        ],
+      },
+      {
+        // API responses — never cache; always fresh
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, no-cache',
+          },
+        ],
+      },
+    ]
+  },
+}
+
+module.exports = nextConfig
+```
+
+### Data Flow
+
+<CdnDataFlowDiagram />
+
+---
 
 ## Schema
 
-_Full content coming in Phase 03._
+### Entity Relationships
+
+<CdnErDiagram />
+
+### Request Data Flow
+
+<CdnSystemFlowDiagram />
+
+---
 
 ## Animations
 
-_Animations coming in Phase 03._
+### Animation 1 — CDN Request Flow (Cache Hit Path)
+
+Watch a user request travel from browser to the nearest CDN edge PoP. The green path shows a cache hit — the edge responds in milliseconds without contacting the origin. Hover or tap any node to see its role.
+
+<CdnRequestFlow />
+
+### Animation 2 — Cache Miss: The Full Round Trip
+
+Step through every phase of what happens when content is absent from the edge cache. The 7-step sequence shows why the first visitor to a PoP always pays the full origin latency — and why all subsequent visitors get a cache hit instead.
+
+<CdnCacheMiss />
+
+### Animation 3 — TTL and Cache Freshness
+
+Adjust the TTL slider to see how long content stays fresh at the edge. Change the scenario to fast-forward time and watch the cache state transition from FRESH to STALE. Toggle `stale-while-revalidate` to see how it eliminates user-visible latency during revalidation.
+
+<CdnTtlInteractive />
+
+### Animation 4 — Thundering Herd vs Origin Shield
+
+Both panels simulate the same event: 8 CDN edge PoPs experiencing a simultaneous cache key expiry — the most dangerous CDN failure mode. The left panel shows what happens to origin without a shield. The right panel shows the origin shield pattern preventing the overload.
+
+<CdnThunderingHerd />
+
+---
 
 ## Common Mistakes
 
-_Full content coming in Phase 03._
+1. **Setting the same TTL for everything.** Static assets with content-hashed filenames can be cached for a year (`max-age=31536000, immutable`) because the filename changes with every build. HTML files reference those assets and must have short TTLs (`max-age=60`) or event-driven purge on deployment — a stale HTML file referencing old asset URLs will cause JS errors after a deploy, even if the assets are still being served.
+
+2. **Not lowering TTL before a migration.** If your CDN TTL is 86,400 seconds (24 hours) and you need to change your origin IP, the change will not propagate to all edge nodes for up to 24 hours. Reduce TTL to 60–300 seconds at least 24 hours before any planned migration, then raise it back after the migration is confirmed stable. This is the same operational rule as DNS TTL — see [How the Web Works](/topics/how-the-web-works).
+
+3. **Assuming CDN always reduces latency.** A CDN with a 10% cache hit rate is slower than a direct origin request — every miss pays two serial hops (user → edge → origin) instead of one. CDN is net-positive only when `(hit rate × saved origin latency) > (miss rate × added two-hop overhead)`. Measure hit rate in your CDN dashboard before assuming the CDN is helping.
+
+4. **Adding `Vary: Cookie` or `Vary: Authorization` to public responses.** The `Vary` header tells CDNs to store a separate cache entry per unique header value. `Vary: Cookie` means one cache entry per unique session cookie — effectively zero cache reuse. A WAF, authentication middleware, or framework may add this silently to all responses. The symptom is a near-zero CDN cache hit rate on content you expect to be cacheable.
+
+5. **Treating CDN cache invalidation as instant by default.** CDN purge APIs propagate in 30–150ms globally (Cloudflare), but not all providers guarantee sub-second propagation. For security-sensitive invalidation — a user whose access is revoked, a file replaced due to a copyright issue — test your CDN's purge propagation time under load. For immediate guarantees, use short TTLs on sensitive resources and treat purge as a best-effort acceleration, not a hard guarantee.
+
+---
 
 ## Interview Prep
 
-_Full content coming in Phase 03._
+### Sample Big-Tech Question
+
+> "Design the content delivery layer for a video streaming platform with 200M subscribers. How would you size the CDN, handle cache invalidation, and protect the origin from thundering herd attacks?"
+
+### Structured Answer
+
+**Step 1: Size the system** *(60 seconds)*
+
+"Peak load: assume 10% of subscribers stream concurrently — 20M sessions. Average video bitrate for a mixed SD/HD/4K library: 6 Mbps. Peak bandwidth: 20M × 6 Mbps = 120 Tbps. For context, Cloudflare's total capacity is ~172 Tbps — so this platform would need a dedicated CDN arrangement, not public cloud CDN at standard rack rates. Cache hit rate for video: 85–95% for popular titles. Origin sees only the miss traffic: 120 Tbps × 10% = 12 Tbps. The long tail — bottom 95% of catalog by title count, roughly 40% of requests — has lower hit rates; budget 30 Tbps origin capacity for those."
+
+**Step 2: CDN architecture** *(45 seconds)*
+
+"Push CDN for the top 5% of titles that will be watched by millions simultaneously — pre-positioned to edge appliances overnight based on prediction models. Pull CDN for everything else. Pull CDN with origin shield: all edge PoPs route misses to a regional tier-2 shield before hitting origin. This means 300 simultaneous European edge misses generate one origin request, not 300. Netflix Open Connect is this pattern at its extreme: ISP-embedded appliances serve 95% of traffic with zero Netflix data-centre contact."
+
+**Step 3: Cache invalidation** *(60 seconds)*
+
+"Three mechanisms in production: First, versioned filenames for all static assets — `thumbnail-abc123.jpg`. When content changes, the filename changes; the old cache entry is irrelevant, no purge needed. Set `Cache-Control: public, max-age=31536000, immutable`. Second, event-driven purge for metadata and index pages — the CDN purge API is called by the CI/CD pipeline on every content update, propagating globally in under 150ms. Third, short TTL (`s-maxage=300, stale-while-revalidate=60`) for frequently-updated data like view counts — slightly stale is acceptable, and stale-while-revalidate means users see zero latency during revalidation. The critical edge case: if a user's subscription is cancelled, their access must be invalidated immediately. CDN TTL cannot be relied upon for this — those resources must carry `Cache-Control: no-store` or use signed URLs with embedded expiry."
+
+**Step 4: Thundering herd protection** *(45 seconds)*
+
+"Two layers: Origin shield prevents cross-PoP thundering herd — all 300 PoP misses for the same key route to a single regional shield, which makes one origin request. Request coalescing prevents within-PoP thundering herd — if 10,000 simultaneous requests hit the same edge for an uncached key, the edge sends one upstream request and fans out the response to all 10,000 waiters. Cloudflare implements this natively as 'request collapsing'. Add TTL jitter (±10% randomisation) for keys that all got cached at the same second, to spread the expiry window."
+
+### Back-of-the-Envelope
+
+| Metric | Value | Notes |
+|---|---|---|
+| Peak concurrent streams | 20M | 10% of 200M subscribers |
+| Average bitrate | 6 Mbps | Mixed SD / HD / 4K |
+| Peak bandwidth demand | 120 Tbps | 20M × 6 Mbps |
+| CDN cache hit rate | 90% | Top 10% titles = 90% of requests (Pareto) |
+| Origin bandwidth (10% miss) | 12 Tbps | 120 Tbps × 0.10 |
+| CDN egress cost ($0.008/GB) | ~$10.4M/day | See math check below |
+| Without CDN ($0.08/GB cloud egress) | ~$104M/day | 10× more expensive |
+| Annual CDN saving vs cloud egress | ~$34B/year | 365 × ($104M − $10.4M) |
+| Edge storage per PoP (top 10% content) | ~500 GB–1 TB | Scales with library size |
+| Purge propagation latency | < 150ms | Cloudflare global purge SLA |
+| Cache miss overhead | +50–150ms | User → edge → shield → origin |
+| Cache hit latency | < 20ms | Edge responds from in-city PoP |
+
+> **Math check — CDN egress cost:**
+> `120 Tbps = 120,000 Gbps = 15,000 GB/s`
+> `15,000 GB/s × 86,400 s/day = 1,296,000,000 GB/day`
+> `1,296,000,000 × $0.008/GB = $10.37M/day`
+
+> **Math check — cloud egress (no CDN):**
+> `1,296,000,000 GB/day × $0.08/GB = $103.7M/day`
+> CDN saves: `$103.7M − $10.4M = $93.3M/day ≈ $34B/year`
+
+The magnitude of this saving explains why Netflix invested $1B+ in Open Connect appliances — even at heavily negotiated CDN rates, the ROI on proprietary infrastructure is measured in billions per year at this scale.
+
+### Follow-up Questions
+
+Think through your answer before revealing it — active recall produces significantly stronger retention than reading a model answer passively.
+
+<CdnQA />
