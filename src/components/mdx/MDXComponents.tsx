@@ -15,7 +15,18 @@ import { DnsFailureModes } from '@/components/animations/topics/DnsFailureModes'
 import { DnsErDiagram } from '@/components/diagrams/DnsErDiagram'
 import { DnsResolutionDiagram } from '@/components/diagrams/DnsResolutionDiagram'
 import { WebRequestLifecycle } from '@/components/diagrams/WebRequestLifecycle'
-// Topic 02: APIs & REST — animations
+// Topic 02: Networking Fundamentals — animations
+import { OsiModelInteractive } from '@/components/animations/topics/OsiModelInteractive'
+import { TcpHandshakeSteps } from '@/components/animations/topics/TcpHandshakeSteps'
+import { TcpVsUdpComparative } from '@/components/animations/topics/TcpVsUdpComparative'
+import { NetworkPacketFlow } from '@/components/animations/topics/NetworkPacketFlow'
+// Topic 02: Networking Fundamentals — diagrams
+import { NetworkingErDiagram } from '@/components/diagrams/NetworkingErDiagram'
+import { NetworkingSystemFlow } from '@/components/diagrams/NetworkingSystemFlow'
+import { NetworkingDataFlowDiagram } from '@/components/diagrams/NetworkingDataFlowDiagram'
+// Topic 02: Networking Fundamentals — Q&A
+import { NetworkingFundamentalsQA } from '@/components/interview/topics/NetworkingFundamentalsQA'
+// Topic 03: APIs & REST — animations
 import { RestRequestFlow } from '@/components/animations/topics/RestRequestFlow'
 import { HttpMethodsExplorer } from '@/components/animations/topics/HttpMethodsExplorer'
 import { OverfetchingComparative } from '@/components/animations/topics/OverfetchingComparative'
@@ -24,9 +35,28 @@ import { StatusCodeSimulator } from '@/components/animations/topics/StatusCodeSi
 import { ApiErDiagram } from '@/components/diagrams/ApiErDiagram'
 import { ApiDataFlowDiagram } from '@/components/diagrams/ApiDataFlowDiagram'
 import { ApiSystemFlowDiagram } from '@/components/diagrams/ApiSystemFlowDiagram'
+// Topic 03: CDN — animations
+import { CdnRequestFlow } from '@/components/animations/topics/CdnRequestFlow'
+import { CdnCacheMiss } from '@/components/animations/topics/CdnCacheMiss'
+import { CdnTtlInteractive } from '@/components/animations/topics/CdnTtlInteractive'
+import { CdnThunderingHerd } from '@/components/animations/topics/CdnThunderingHerd'
+// Topic 03: CDN — diagrams
+import { CdnErDiagram } from '@/components/diagrams/CdnErDiagram'
+import { CdnDataFlowDiagram } from '@/components/diagrams/CdnDataFlowDiagram'
+import { CdnSystemFlowDiagram } from '@/components/diagrams/CdnSystemFlowDiagram'
+// Interview Guide — framework animations
+import { InterviewFrameworkSteps } from '@/components/animations/interview-guide/InterviewFrameworkSteps'
+import { RlRequirementsSteps } from '@/components/animations/interview-guide/RlRequirementsSteps'
+import { RlTokenBucketFlow } from '@/components/animations/interview-guide/RlTokenBucketFlow'
+import { RlAlgorithmComparative } from '@/components/animations/interview-guide/RlAlgorithmComparative'
+// Interview Guide — diagrams
+import { RlErDiagram } from '@/components/diagrams/RlErDiagram'
+import { RlSystemDiagram } from '@/components/diagrams/RlSystemDiagram'
+import { RlApiFlowDiagram } from '@/components/diagrams/RlApiFlowDiagram'
 // Interview Q&A accordion wrappers — one per topic
 import { HowTheWebWorksQA } from '@/components/interview/topics/HowTheWebWorksQA'
 import { ApisAndRestQA } from '@/components/interview/topics/ApisAndRestQA'
+import { CdnQA } from '@/components/interview/topics/CdnQA'
 
 /**
  * Converts any string to a URL-safe anchor ID.
@@ -193,18 +223,53 @@ export const mdxComponents: MDXComponents = {
   DnsResolutionDiagram,
   WebRequestLifecycle,
 
-  // ── Topic 02: APIs & REST — animations ────────────────────────────────────
+  // ── Topic 02: Networking Fundamentals — animations ───────────────────────
+  OsiModelInteractive,
+  TcpHandshakeSteps,
+  TcpVsUdpComparative,
+  NetworkPacketFlow,
+
+  // ── Topic 02: Networking Fundamentals — diagrams ─────────────────────────
+  NetworkingErDiagram,
+  NetworkingSystemFlow,
+  NetworkingDataFlowDiagram,
+
+  // ── Topic 03: APIs & REST — animations ────────────────────────────────────
   RestRequestFlow,
   HttpMethodsExplorer,
   OverfetchingComparative,
   StatusCodeSimulator,
 
-  // ── Topic 02: APIs & REST — diagrams ──────────────────────────────────────
+  // ── Topic 03: APIs & REST — diagrams ──────────────────────────────────────
   ApiErDiagram,
   ApiDataFlowDiagram,
   ApiSystemFlowDiagram,
 
+  // ── Topic 04: CDN — animations ────────────────────────────────────────────
+  CdnRequestFlow,
+  CdnCacheMiss,
+  CdnTtlInteractive,
+  CdnThunderingHerd,
+
+  // ── Topic 04: CDN — diagrams ──────────────────────────────────────────────
+  CdnErDiagram,
+  CdnDataFlowDiagram,
+  CdnSystemFlowDiagram,
+
+  // ── Interview Guide — framework animations ────────────────────────────────
+  InterviewFrameworkSteps,
+  RlRequirementsSteps,
+  RlTokenBucketFlow,
+  RlAlgorithmComparative,
+
+  // ── Interview Guide — diagrams ────────────────────────────────────────────
+  RlErDiagram,
+  RlSystemDiagram,
+  RlApiFlowDiagram,
+
   // ── Interview Q&A accordions (one wrapper per topic) ───────────────────────
   HowTheWebWorksQA,
+  NetworkingFundamentalsQA,
   ApisAndRestQA,
+  CdnQA,
 }

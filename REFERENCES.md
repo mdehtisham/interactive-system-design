@@ -19,7 +19,7 @@ Curated, verified learning resources for this project. All entries were adversar
 
 ---
 
-### FAANG & Big Tech Engineering Blogs
+### Big Tech Engineering Blogs
 
 These are primary sources — real production decisions, real scale, real trade-offs. Use them to source topic examples and real-world case studies for the platform.
 
@@ -67,7 +67,7 @@ These are primary sources — real production decisions, real scale, real trade-
 
 **For topic selection:** Start with `ashishps1/awesome-system-design-resources` (HLD) and `ashishps1/awesome-low-level-design` (LLD). The difficulty tiers map directly to the platform's Easy → Medium → Hard topic progression.
 
-**For real-world examples:** Pull case studies from the FAANG blogs — each topic on this platform should reference at least one real production system by name (e.g., Discord's message storage for sharding, Netflix's CDN for caching).
+**For real-world examples:** Pull case studies from the Big Tech blogs — each topic on this platform should reference at least one real production system by name (e.g., Discord's message storage for sharding, Netflix's CDN for caching).
 
 **For MongoDB schema topics:** The MongoDB Docs design patterns page is the canonical LLD reference for the data modeling sections of this platform.
 

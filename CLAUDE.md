@@ -92,9 +92,9 @@ reproduce the exact same bugs in new components.
 
 ## Project Purpose
 
-An open-source, interactive system design learning platform that teaches FAANG-tier distributed systems concepts visually — through live code, production-grade schemas, Mermaid.js diagrams, Framer Motion animations, and interview prep. Built with Next.js, Node.js, Express.js, and MongoDB.
+An open-source, interactive system design learning platform that teaches Big Tech-tier distributed systems concepts visually — through live code, production-grade schemas, Mermaid.js diagrams, Framer Motion animations, and interview prep. Built with Next.js, Node.js, Express.js, and MongoDB.
 
-**Primary user:** A Primary user is Fronend/backend developer having 3-5 years of experience transitioning to Full Stack (MERN/MEAN) and targeting FAANG-level roles. Explanations should bridge backend/distributed systems concepts to frontend mental models where possible.
+**Primary user:** A Primary user is Fronend/backend developer having 3-5 years of experience transitioning to Full Stack (MERN/MEAN) and targeting Big Tech-level roles. Explanations should bridge backend/distributed systems concepts to frontend mental models where possible.
 
 ---
 
@@ -202,7 +202,7 @@ This platform covers **both** High-Level Design and Low-Level Design — in a fi
 - Distributed systems concepts (caching, sharding, load balancing, rate limiting, CAP theorem)
 - System-level Mermaid flowcharts (`Client → CDN → Load Balancer → Microservice → DB`)
 - Trade-off tables, back-of-the-envelope estimations (QPS, storage, bandwidth)
-- FAANG-style interview answers — the system design interview round tests almost exclusively at HLD level
+- Big Tech-style interview answers — the system design interview round tests almost exclusively at HLD level
 
 **LLD follows immediately, grounded in the HLD:**
 - The actual Next.js/Node/Express code implementing the concept
@@ -211,7 +211,7 @@ This platform covers **both** High-Level Design and Low-Level Design — in a fi
 
 **The platform's differentiator:** most system design resources stop at HLD (boxes and arrows). Here, every HLD concept is immediately followed by working LLD — real schemas, real endpoints, real animations — so learners understand not just what the architecture looks like, but how to build it.
 
-**FAANG interview mapping:**
+**Big Tech interview mapping:**
 | Interview Round | Design Type | What This Platform Covers |
 |---|---|---|
 | System Design Round | HLD | Distributed concepts, trade-offs, estimations |
@@ -248,7 +248,7 @@ If a user lands on a topic they aren't ready for, the prerequisites block is the
 
 1. **ELI5 Foundation** — explain the concept as if explaining to a curious 10-year-old who has never heard of it. Lead with a real-world analogy that is relatable (food, traffic, toys, school) before introducing any technical term. Keep it under 5 sentences. This section exists even for the most advanced topics — if you cannot explain Database Sharding simply, the explanation is not ready. The technical term is introduced at the *end* of the analogy, not the beginning.
 
-2. **FAANG Concept Deep-Dive** — explain the concept in the context of large-scale distributed systems (e.g., how Netflix uses caching, how Google handles sharding). Reference real systems by name.
+2. **Big Tech Concept Deep-Dive** — explain the concept in the context of large-scale distributed systems (e.g., how Netflix uses caching, how Google handles sharding). Reference real systems by name.
 
 3. **`## Implementation`** — the LLD section. Three required sub-sections, always in this order:
 
@@ -321,7 +321,7 @@ If a user lands on a topic they aren't ready for, the prerequisites block is the
 
 6. **Common Mistakes** — 3–5 bullet points on what developers get wrong when implementing or designing this concept. Pitched at someone learning it for the first time.
 
-7. **Interview Prep** — FAANG-style answer outline including back-of-the-envelope estimation (QPS, storage, bandwidth). Include a sample question and a structured answer template.
+7. **Interview Prep** — Big Tech-style answer outline including back-of-the-envelope estimation (QPS, storage, bandwidth). Include a sample question and a structured answer template.
 
    **Follow-up Questions — required format (non-negotiable):**
    Never write follow-up questions as a plain bullet list. Every topic must end its Interview Prep section with an `<InterviewQAAccordion>` powered by a topic-specific wrapper component. Each question must have all four fields:
@@ -330,7 +330,7 @@ If a user lands on a topic they aren't ready for, the prerequisites block is the
    {
      question: string   // exactly as an interviewer would ask it
      intent:   string   // one sentence: what the interviewer is actually probing for
-     answer:   string   // the model answer — what a 10/10 FAANG response sounds like
+     answer:   string   // the model answer — what a 10/10 Big Tech response sounds like
      trap?:    string   // the specific mistake most candidates make on this question
    }
    ```
@@ -376,7 +376,7 @@ Follow the sequence in `TOPICS.md` exactly — the prerequisite chain is the imp
 
 ## Interview Prep Standards
 
-Every Interview Prep section **must** meet these standards before a topic is marked complete. These rules exist because wrong numbers or missing core challenges are immediately disqualifying in a real FAANG interview.
+Every Interview Prep section **must** meet these standards before a topic is marked complete. These rules exist because wrong numbers or missing core challenges are immediately disqualifying in a real Big Tech interview.
 
 ### Back-of-the-Envelope — Math Rules (Non-Negotiable)
 
@@ -399,7 +399,7 @@ The most common error: confusing GB and TB (factor of 1,000). Always compute; ne
 
 ### Structured Answer — Core Engineering Challenge
 
-Every FAANG system design answer must proactively address the **core engineering challenge** of the topic — the one thing interviewers always probe — even if the question does not explicitly ask. Raising it unprompted signals depth and separates a 7/10 answer from a 10/10.
+Every Big Tech system design answer must proactively address the **core engineering challenge** of the topic — the one thing interviewers always probe — even if the question does not explicitly ask. Raising it unprompted signals depth and separates a 7/10 answer from a 10/10.
 
 **Known core challenges per common design question:**
 
