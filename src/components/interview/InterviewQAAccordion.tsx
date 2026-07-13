@@ -7,7 +7,7 @@ export interface QAItem {
   question: string
   /** One sentence: what the interviewer is really probing for. */
   intent: string
-  /** The model answer — what a 10/10 FAANG response sounds like. */
+  /** The model answer — what a 10/10 Big Tech response sounds like. */
   answer: string
   /** The specific mistake most candidates make on this question. */
   trap?: string

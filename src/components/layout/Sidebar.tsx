@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import { useUIStore } from '@/store/uiStore'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
-import { ChevronRight, Home } from 'lucide-react'
+import { ChevronRight, Home, BookOpen } from 'lucide-react'
 import { topics } from '@/lib/topics'
 import type { Cluster } from '@/types/topic'
 import { cn } from '@/lib/utils'
@@ -42,6 +42,21 @@ function SidebarNav({ pathname, onNavigate }: NavProps) {
         >
           <Home className="h-4 w-4 shrink-0" />
           Home
+        </Link>
+
+        {/* Interview Guide link */}
+        <Link
+          href="/interview-guide"
+          onClick={onNavigate}
+          className={cn(
+            'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors mb-1',
+            pathname === '/interview-guide'
+              ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
+              : 'text-zinc-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100'
+          )}
+        >
+          <BookOpen className="h-4 w-4 shrink-0" />
+          Interview Framework
         </Link>
 
         <div className="my-1 border-t border-border" />

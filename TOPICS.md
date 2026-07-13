@@ -1,6 +1,6 @@
 # TOPICS.md
 
-Topic registry for the interactive system design platform. Covers the MVP set (14 topics) and the post-MVP backlog. Every topic follows the 7-step methodology defined in CLAUDE.md.
+Topic registry for the interactive system design platform. Covers the MVP set (15 topics) and the post-MVP backlog. Every topic follows the 7-step methodology defined in CLAUDE.md.
 
 ---
 
@@ -12,7 +12,7 @@ Each topic carries internal tags that power learning paths without restructuring
 |---|---|---|
 | `cluster` | `web-foundations` `storage` `scale` `reliability` | The 4 MVP cluster a topic belongs to |
 | `difficulty` | `easy` `medium` `hard` | Difficulty tier (maps to ashishps1 difficulty scale) |
-| `interview-frequency` | `high` `medium` `low` | How often this appears in real FAANG system design rounds |
+| `interview-frequency` | `high` `medium` `low` | How often this appears in real Big Tech system design rounds |
 | `path` | `fundamentals-first` `interview-critical` `complexity-ladder` | Which learning paths include this topic |
 | `hld-weight` | `primary` `supporting` | Whether the topic is predominantly HLD or leans toward LLD grounding |
 | `status` | `mvp` `backlog` | Whether the topic is in the MVP or post-MVP backlog |
@@ -27,7 +27,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-## MVP Topics (14)
+## MVP Topics (15)
 
 ### Cluster 1 — Web Foundations
 
@@ -54,7 +54,32 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 2. APIs & REST
+#### 2. Networking Fundamentals
+
+| Field | Value |
+|---|---|
+| Slug | `networking-fundamentals` |
+| Cluster | `web-foundations` |
+| Difficulty | `easy` |
+| Interview Frequency | `medium` |
+| Path | `fundamentals-first` `complexity-ladder` |
+| HLD Weight | `primary` |
+| Status | `mvp` |
+| Prerequisites | `how-the-web-works` |
+
+**Covers:** The OSI model (all 7 layers — what lives at each layer and why interviewers care), TCP vs UDP (connection-oriented vs connectionless, the 3-way handshake, reliability guarantees, when to choose each), bandwidth vs latency vs throughput (distinct concepts, common confusion), connection pooling, NAT and why private IPs exist, switches vs routers vs firewalls (Layer 2 vs Layer 3 vs Layer 4+), packet routing at a conceptual level. Maps every concept from "How the Web Works" to its OSI layer so the learner has a unified mental model.
+
+**OSI model animation (required — see image reference):** An interactive animated pyramid of the 7 OSI layers — Physical (1) through Application (7). Clicking any layer highlights it and shows: (a) what protocols/technologies live at that layer, (b) what distributed systems concepts from this platform are grounded at that layer. The annotations from the image are the content template:
+- **Application Layer (7):** HTTP/HTTPS, REST vs GraphQL vs gRPC, RESTful semantics, DNS resolution, WebSockets vs SSE
+- **Transport Layer (4):** TCP, UDP, request-response lifecycle
+- **Network Layer (3):** IP routing, Load Balancing concepts, Firewalls, ACLs
+- **Data Link / Physical (1–2):** switches, MAC addressing (context only — not Big Tech interview depth)
+
+**LLD angle:** No DB model needed for this topic (foundational, no application-layer schema). The Schema section's Entity Relationships diagram serves as the data structure reference. Show a Wireshark-style conceptual trace of a single HTTP request annotated at each OSI layer it touches — implemented as a step-through Framer Motion animation, not a live tool.
+
+---
+
+#### 3. APIs & REST
 
 | Field | Value |
 |---|---|
@@ -65,7 +90,7 @@ Each topic carries internal tags that power learning paths without restructuring
 | Path | `fundamentals-first` `interview-critical` |
 | HLD Weight | `primary` |
 | Status | `mvp` |
-| Prerequisites | `how-the-web-works` |
+| Prerequisites | `how-the-web-works` `networking-fundamentals` |
 
 **Covers:** REST principles, HTTP methods, status codes, request/response structure, idempotency, statelessness, API versioning, trade-off table: REST vs GraphQL vs gRPC.
 
@@ -73,7 +98,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 3. Content Delivery Networks (CDN)
+#### 4. Content Delivery Networks (CDN)
 
 | Field | Value |
 |---|---|
@@ -98,7 +123,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 4. Databases 101
+#### 5. Databases 101
 
 | Field | Value |
 |---|---|
@@ -117,7 +142,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 5. Database Indexing
+#### 6. Database Indexing
 
 | Field | Value |
 |---|---|
@@ -136,7 +161,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 6. Replication Strategies
+#### 7. Replication Strategies
 
 | Field | Value |
 |---|---|
@@ -155,7 +180,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 7. CAP Theorem
+#### 8. CAP Theorem
 
 | Field | Value |
 |---|---|
@@ -174,7 +199,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 8. Database Sharding
+#### 9. Database Sharding
 
 | Field | Value |
 |---|---|
@@ -191,7 +216,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 **LLD angle:** MongoDB sharded cluster configuration. Mermaid diagram showing a sharded cluster with config servers and mongos router. ER diagram showing how a sharded collection is partitioned across shards.
 
-> **Note:** `scalability` (Cluster 3, Topic 9) is a prerequisite — this topic appears in Cluster 2 but cannot be unlocked until Cluster 3 Topic 9 is completed. Treat as the capstone of the storage cluster.
+> **Note:** `scalability` (Cluster 3, Topic 10) is a prerequisite — this topic appears in Cluster 2 but cannot be unlocked until Cluster 3 Topic 10 is completed. Treat as the capstone of the storage cluster.
 
 ---
 
@@ -201,7 +226,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 9. Scalability
+#### 10. Scalability
 
 | Field | Value |
 |---|---|
@@ -220,7 +245,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 10. Load Balancing
+#### 11. Load Balancing
 
 | Field | Value |
 |---|---|
@@ -241,7 +266,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 11. Caching
+#### 12. Caching
 
 | Field | Value |
 |---|---|
@@ -266,7 +291,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 12. Message Queues
+#### 13. Message Queues
 
 | Field | Value |
 |---|---|
@@ -285,7 +310,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 13. Rate Limiting & API Gateways
+#### 14. Rate Limiting & API Gateways
 
 | Field | Value |
 |---|---|
@@ -304,7 +329,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 14. Resilience Patterns
+#### 15. Resilience Patterns
 
 | Field | Value |
 |---|---|
