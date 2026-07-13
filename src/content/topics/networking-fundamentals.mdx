@@ -1,0 +1,271 @@
+---
+title: 'Networking Fundamentals'
+description: 'The OSI model, TCP vs UDP, bandwidth vs latency, and every protocol a Big Tech system design interview expects you to place on the right layer — from first principles to production architecture decisions.'
+order: 2
+cluster: web-foundations
+difficulty: easy
+interviewFrequency: medium
+---
+
+## Prerequisites
+
+- [How the Web Works](/topics/how-the-web-works) — introduces DNS, TCP/IP, and HTTP at a high level; this topic maps all of that to the precise OSI layer it operates at and explains the trade-offs underneath.
+
+---
+
+## What is Networking? (The Birthday Card Analogy)
+
+Imagine you want to send a birthday card to a friend who lives across the country.
+
+You write the card — that is the message you actually care about. You put it in an envelope and write their address on the front. The post office adds a tracking barcode. A mail truck drives it to a sorting centre. The sorting centre routes it to another truck. The truck drops it at a local post office. The postman delivers it to your friend's door.
+
+Your friend opens the door, takes the letter from the postman, opens the envelope, and reads the card.
+
+Notice what happened: your message got **wrapped in layer after layer** on the way out — envelope, tracking, routing instructions, physical transport — and **each layer was peeled off** on the way in. Your friend only ever sees the card. The envelope, the sorting labels, the truck route — all of those were infrastructure that made delivery possible, but invisible to the final reader.
+
+The internet works exactly the same way. This layering system has a name: the **OSI model** — Open Systems Interconnection. It has 7 layers. Each layer solves exactly one problem and hands the result to the layer above or below it.
+
+You do not need to memorise all 7 layers. You need to understand which protocols live at which layer, because Big Tech interviewers ask this constantly — often indirectly. "How would you design a load balancer?" is a question about Layer 4 vs Layer 7. "How does Cloudflare route users to the nearest data centre?" is a question about Layer 3 anycast. "Why is HTTP/3 faster on mobile?" is a question about Layer 4 TCP head-of-line blocking.
+
+---
+
+## Big Tech Deep-Dive
+
+### Netflix: Switching from TCP to QUIC
+
+Netflix serves 250 million subscribers simultaneously. Their biggest streaming quality problem was not bandwidth — they had plenty. It was **TCP head-of-line blocking**.
+
+HTTP/2 multiplexes multiple streams over a single TCP connection. TCP guarantees byte-order delivery: if segment 47 is lost, TCP stalls the entire connection until segment 47 is retransmitted and arrives — even if segments 48–100 are complete and waiting in the receive buffer. On a wired connection with 0.01% packet loss, this almost never happens. On a mobile network with 1–5% packet loss (common on LTE in crowded environments), it causes video to stall every few minutes.
+
+The fix was HTTP/3 over QUIC. QUIC runs over UDP and implements its own reliability mechanism **per stream** — a lost packet in stream A does not block stream B. Netflix measured a 9% reduction in rebuffering rate after enabling QUIC on mobile networks. That 9% improvement translates directly to user retention.
+
+### Google: Building the Internet Inside the Internet
+
+Google operates **B4**, one of the largest private WANs on Earth. Rather than routing inter-data-centre traffic over the public internet (which uses BGP and delivers inconsistent latency), Google built a software-defined network between its own facilities.
+
+**Google Jupiter** is the data centre network fabric — a 5-stage Clos topology that delivers 1+ Petabit/second of bisection bandwidth inside a single data centre. **Google Andromeda** is the SDN stack that virtualises the network and powers VPC networking in GCP. When Google guarantees sub-200ms response times globally, this private network — not just CDN caching — is why that is achievable.
+
+### Cloudflare: Anycast at Layer 3
+
+Cloudflare operates 330+ PoPs globally. All of them announce the **same IP address** to the internet via BGP. When a user queries 1.1.1.1 (Cloudflare's DNS resolver), their ISP's BGP routing table automatically routes them to the topologically nearest Cloudflare PoP — not because of application logic, not because of a DNS lookup, but because of how Layer 3 routing works.
+
+This also provides DDoS absorption: a 500 Gbps volumetric attack targeting one anycast IP is automatically distributed across 330 PoPs (~1.5 Gbps per PoP), preventing any single location from being overwhelmed.
+
+### AWS: Security Groups vs NACLs — The Stateful vs Stateless Distinction
+
+AWS VPC gives you two security mechanisms that frequently appear in interviews:
+
+**Security Groups** operate at the instance level (Layer 4/5). They are **stateful**: if you allow inbound traffic on port 443, TCP connection state is tracked and the return traffic is automatically allowed, even if there is no explicit outbound rule for that port.
+
+**NACLs** (Network Access Control Lists) operate at the subnet level (Layer 3/4). They are **stateless**: you must explicitly allow both inbound AND outbound traffic, because NACLs do not track TCP connection state.
+
+The architectural implication: stateful firewalls must maintain a connection-tracking table that grows linearly with active connections. At high connection rates, this table is a memory and CPU bottleneck. NACLs are faster precisely because they are stateless — each packet is evaluated independently against a rule list, with no table lookup.
+
+---
+
+## Implementation
+
+> This is a foundational topic with no application database model. The `Schema Design` sub-section is omitted. The Entity Relationships diagram in the Schema section serves as the conceptual data structure reference.
+
+### API Contract
+
+A practical networking diagnostic endpoint — the kind Big Tech companies use internally to inspect request metadata, verify CDN headers, and debug routing issues.
+
+```ts
+// GET /api/v1/network/diagnostic
+// Returns: network metadata for the current request.
+// Useful for: debugging CDN header stripping, verifying TLS termination,
+//             confirming IP addresses behind reverse proxies.
+//
+// Response shape:
+// {
+//   protocol:   'https' | 'http'
+//   httpVersion: '2.0' | '1.1' | '1.0'
+//   remoteIp:   string        // IP of the direct TCP connection (may be LB)
+//   realIp:     string | null // X-Real-IP (set by nginx/CDN, actual client)
+//   forwardedFor: string[]    // X-Forwarded-For chain (client → proxy → LB)
+//   host:       string
+//   userAgent:  string | null
+//   cfRay:      string | null // Cloudflare PoP identifier (if behind CF)
+//   cfIpCountry: string | null
+// }
+```
+
+**Route wiring:**
+```ts
+// src/app/api/v1/network/diagnostic/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+
+export async function GET(req: NextRequest) {
+  const xff = req.headers.get('x-forwarded-for') ?? ''
+
+  return NextResponse.json({
+    protocol:     req.nextUrl.protocol.replace(':', ''),
+    httpVersion:  req.headers.get('x-forwarded-proto') ?? 'unknown',
+    remoteIp:     req.headers.get('x-real-ip') ?? req.ip ?? 'unknown',
+    realIp:       req.headers.get('x-real-ip'),
+    forwardedFor: xff ? xff.split(',').map((s) => s.trim()) : [],
+    host:         req.headers.get('host') ?? '',
+    userAgent:    req.headers.get('user-agent'),
+    cfRay:        req.headers.get('cf-ray'),
+    cfIpCountry:  req.headers.get('cf-ipcountry'),
+  })
+}
+```
+
+**Why this matters for system design interviews:** Understanding `X-Forwarded-For` shows you know that in a multi-tier architecture (client → CDN → load balancer → app server), the app server's `req.ip` is the load balancer's IP, not the client's. `X-Forwarded-For` carries the original chain. This is relevant when discussing: rate limiting by client IP (you must read `X-Forwarded-For`), security logging, and geographic routing logic.
+
+### Data Flow
+
+<NetworkingDataFlowDiagram />
+
+---
+
+## Schema
+
+### Entity Relationships
+
+<NetworkingErDiagram />
+
+### Request Data Flow
+
+<NetworkingSystemFlow />
+
+---
+
+## Animation 1 — The OSI Model (Interactive Layer Explorer)
+
+The 7-layer model maps every protocol, device, and system design concept to a precise layer. Click any layer to see what lives there, which devices operate at that layer, and why Big Tech interviewers care about it. **Transport Layer (4) is pre-selected** — it is the most interview-critical layer.
+
+<OsiModelInteractive />
+
+---
+
+## Animation 2 — TCP 3-Way Handshake (Step-Through)
+
+Before TCP can transfer a single byte of application data, both sides must agree to communicate. This takes exactly 3 steps and 1.5 round trips. Step through to see precisely what is exchanged at each step and why skipping any step would break the protocol.
+
+<TcpHandshakeSteps />
+
+---
+
+## Animation 3 — TCP vs UDP: Reliability vs Speed (Comparative)
+
+TCP guarantees every packet arrives in order — at the cost of acknowledgements and retransmission delays. UDP fires packets and moves on — lower latency, zero delivery guarantee. Watch both handle a packet loss event simultaneously to see how differently they respond.
+
+<TcpVsUdpComparative />
+
+---
+
+## Animation 4 — Packet Encapsulation (Passive Flow)
+
+When your browser sends a request, it travels down the OSI stack on the sender side (adding headers at each layer), crosses the internet as raw bits, then travels back up the OSI stack on the receiver side (stripping headers at each layer). Hover or tap any node to see what that layer adds or removes.
+
+<NetworkPacketFlow />
+
+---
+
+## Trade-Off Summary
+
+| Decision | Layer 4 (TCP/UDP) | Layer 7 (HTTP/Application) |
+|---|---|---|
+| **What it sees** | IP address + port only | Full HTTP headers, path, body |
+| **Load balancer type** | L4 LB — fast, protocol-agnostic | L7 LB — path routing, TLS termination |
+| **Firewall type** | Stateful (Security Group) or stateless (NACL) | WAF — inspects HTTP payloads |
+| **When to use L4** | DB proxies, raw TCP perf, non-HTTP protocols | — |
+| **When to use L7** | — | Path routing, A/B testing, header injection |
+
+| Protocol | Reliability | Ordering | Overhead | Use cases |
+|---|---|---|---|---|
+| **TCP** | Guaranteed (retransmission) | Strictly ordered | High (handshake, ACKs) | HTTP, databases, file transfer |
+| **UDP** | Best-effort (no retransmission) | No guarantee | Minimal (no setup) | Video/audio, DNS, gaming, QUIC |
+| **QUIC** | Per-stream (application-level) | Per-stream | Medium (crypto, no HOL) | HTTP/3, low-latency reliability |
+
+---
+
+## Common Mistakes
+
+1. **Confusing Layer 4 and Layer 7 load balancers.** Saying "use a load balancer" without specifying the layer is an incomplete answer. L4 and L7 LBs have different capabilities and cost profiles: an L7 LB (ALB, nginx, Envoy) terminates TLS, reads HTTP, and handles 10× less raw throughput per instance than an L4 LB. In a design with 500K RPS, routing all traffic through L7 from the start is an expensive default; L4 at the edge with L7 internally is a common production pattern.
+
+2. **Using UDP "for speed" without handling reliability in the application.** UDP is appropriate when loss is tolerable or when the application can recover better than TCP's retransmission. Choosing UDP and then silently dropping requests (a payment confirmation, a database write) is catastrophic. DNS uses UDP because the client retries automatically; DNS does not use UDP because data loss is acceptable — it uses UDP because the retry loop is fast and the payload fits in one datagram.
+
+3. **Forgetting the TCP handshake cost in latency calculations.** A common back-of-the-envelope mistake: "round trip to my database is 1ms." If this is a new connection, add 1.5ms for the TCP handshake (0.5ms × 3 steps at 1ms RTT). At 1,000 new connections/second, that is 1,500ms of pure handshake overhead per second. Connection pooling is not an optimisation — it is a correctness measure for any production system.
+
+4. **Treating X-Forwarded-For as trusted without validation.** `X-Forwarded-For` is set by load balancers and CDNs — but a client can also inject it directly in their request headers, spoofing any IP. When using `X-Forwarded-For` for rate limiting or access control, only read the **first IP added by your own trusted infrastructure**, not the first IP in the chain (which the client controls). Best practice: configure your CDN/LB to overwrite `X-Forwarded-For` rather than append to it.
+
+5. **Thinking anycast and GeoDNS are equivalent.** GeoDNS returns different DNS records based on the querying IP — it operates at Layer 7 and is subject to DNS caching TTLs. Anycast routes at Layer 3 via BGP — failover is automatic within seconds when a PoP withdraws its route, with no DNS TTL involved. For DDoS mitigation and sub-second failover (Cloudflare, Fastly, AWS Global Accelerator), anycast is the correct mechanism. GeoDNS is appropriate for routing users to different application regions, not for real-time failover.
+
+---
+
+## Interview Prep
+
+### The Core Engineering Challenge
+
+For any networking question, the detail that separates a 7/10 answer from a 10/10 answer is demonstrating you know **which OSI layer** a technology operates at and **why that layer matters** for the trade-off. Interviewers are not testing whether you can recite the 7 layers — they are testing whether you can reason from first principles: "A Layer 7 load balancer reads HTTP headers, so it can do path-based routing — but that means it must terminate TLS, which adds CPU cost. A Layer 4 LB cannot do path routing but handles 10× more throughput per instance. The right choice depends on whether you need application-level routing."
+
+### Back-of-the-Envelope
+
+**Speed-of-light latency floor:**
+
+```
+NYC → London distance:       ~5,570 km
+Fiber optic signal speed:    ~200,000 km/s (2/3 speed of light)
+Minimum one-way latency:     5,570 km ÷ 200,000 km/s = 0.0279s = 27.9ms
+Typical real RTT (NYC↔London): ~70ms (routing + switching + processing overhead)
+```
+
+> Math check: 5,570 ÷ 200,000 = 0.02785 seconds = 27.85ms one-way. Double for RTT = 55.7ms theoretical minimum. Real RTT ~70ms includes ~14ms of routing overhead across ~10 BGP hops.
+
+**TCP handshake overhead at scale:**
+
+```
+Handshake cost per connection:   1.5 × RTT
+At 70ms RTT (cross-continent):   1.5 × 70ms = 105ms per new connection
+At 5ms RTT (same data centre):   1.5 × 5ms  = 7.5ms per new connection
+
+API server at 1,000 new DB connections/second:
+  1,000 × 7.5ms = 7,500ms of pure handshake overhead/second
+  = 7.5s of CPU time wasted on connection setup per second of requests
+
+With connection pool of 20 persistent connections:
+  20 handshakes total, amortised across millions of requests
+  Overhead per request: effectively 0ms
+```
+
+> Math check: 1,000 connections × 7.5ms = 7,500ms = 7.5 seconds of sequential overhead. In practice these happen in parallel so they do not add 7.5s to each request, but they consume 7,500ms of CPU time across threads — plus the corresponding database overhead.
+
+**Bandwidth vs throughput:**
+
+```
+1 Gbps network link:              1,000,000,000 bits/second
+                          ÷ 8 = 125,000,000 bytes/second = 125 MB/s
+Real throughput (85% efficiency):  ~106 MB/s
+
+4K video stream:       ~25 Mbps = ~3.1 MB/s
+Concurrent 4K streams per Gbps:   106 MB/s ÷ 3.1 MB/s ≈ 34 streams
+
+Netflix at peak (250M concurrent):
+  250M × 25 Mbps = 6.25 Tbps total egress
+  ÷ 1 Gbps per server = 6,250 servers minimum for egress alone
+  (In practice: CDN handles most egress — Netflix Open Connect caches top titles at ISPs)
+```
+
+> Math check: 250M × 25Mbps = 6,250,000 Mbps = 6,250 Gbps = 6.25 Tbps. Divided by 1 Gbps per server = 6,250 servers. This is why Netflix Open Connect (in-ISP caching) is the core of their infrastructure, not origin server scaling.
+
+### Sample Interview Question
+
+> "You are designing the networking layer for a new CDN with 50 global PoPs. Walk me through how a user request gets routed to the nearest PoP, what happens if that PoP is down, and how TLS fits into this architecture."
+
+**Structured answer outline:**
+
+1. **PoP selection via anycast (Layer 3):** All 50 PoPs announce the same IP range via BGP. Users are routed to the nearest PoP by the internet's BGP infrastructure — no application logic required.
+2. **TLS termination at the PoP (Layer 6):** Each PoP holds a wildcard TLS certificate. TLS is terminated at the PoP — plaintext is forwarded to origin over the CDN's private backbone if needed.
+3. **Failover when a PoP is down:** The failed PoP withdraws its BGP announcement. BGP reconverges globally within ~30–60 seconds. Users previously routed to the failed PoP are automatically rerouted to the next-nearest PoP.
+4. **Origin shield (Layer 7):** For cache misses, route all PoP misses through a regional origin shield (one per continent) rather than directly to origin. Reduces origin contact from 50 PoPs to 5 shields.
+5. **Back-of-envelope:** At 50M users globally, assuming 40% peak concurrency = 20M concurrent, at 1Mbps avg = 20 Tbps total. 50 PoPs = 400 Gbps per PoP average. At 1 Gbps per server = 400 servers per PoP minimum.
+
+---
+
+Think through your answer before revealing it.
+
+<NetworkingFundamentalsQA />
