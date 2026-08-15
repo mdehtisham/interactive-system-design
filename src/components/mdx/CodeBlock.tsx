@@ -58,7 +58,7 @@ export function CodeBlock({ children, className, ...rest }: Props) {
     <div className="group relative my-5 overflow-hidden rounded-lg border border-border">
       {/* Top bar: language label + copy button */}
       <div className="flex items-center justify-between border-b border-border bg-muted/50 px-4 py-1.5">
-        <span className="text-xs font-medium text-muted-foreground">
+        <span className="ui-code-label text-xs font-medium">
           {language || 'code'}
         </span>
 
@@ -67,7 +67,9 @@ export function CodeBlock({ children, className, ...rest }: Props) {
           aria-label={copied ? 'Copied' : 'Copy code'}
           className={cn(
             'flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-md px-2',
-            'text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground',
+            'text-xs text-zinc-500 dark:text-zinc-400 transition-[colors,transform]',
+            'hover:bg-gray-200 dark:hover:bg-zinc-600 hover:text-gray-900 dark:hover:text-zinc-100',
+            'active:scale-[0.97]',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
           )}
         >

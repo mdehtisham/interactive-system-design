@@ -1,0 +1,58 @@
+'use client'
+
+import { InterviewQAAccordion, type QAItem } from '@/components/interview/InterviewQAAccordion'
+
+const ITEMS: QAItem[] = [
+  {
+    question: 'How do you invalidate a CDN cache immediately after a deployment? What are the three strategies and when do you use each?',
+    intent: 'Whether you know all three invalidation mechanisms — most candidates only know TTL expiry, which means they ship broken deployments.',
+    answer:
+      'Three strategies, each suited to different content: (1) Versioned filenames — embed a content hash in the asset URL: main.abc123.js. When content changes, the hash changes, the URL changes, and the old URL\'s cache entry is irrelevant. Use for all immutable assets (JS, CSS, images). Set TTL to 1 year with immutable — the URL itself is the cache key, so staleness is impossible. No CDN API calls needed. (2) Event-driven purge — after deployment, call the CDN purge API to immediately evict specific cache keys or URL patterns. Cloudflare supports instant purge across all PoPs in under 150ms globally. Use for HTML files, JSON responses, and any URL that cannot be versioned. (3) TTL expiry — let the cache naturally expire. Use only when staleness is acceptable (e.g., CDN-cached API responses where 60-second staleness is fine). The production pattern: versioned URLs for all static assets (zero deployment disruption), event-driven purge for HTML files triggered by your CI/CD pipeline.',
+    trap:
+      'Saying "just set a short TTL" as the invalidation strategy. Short TTL is not invalidation — it is tolerated staleness. A 60-second TTL means content can be wrong for up to 60 seconds per deployment. For HTML files that reference new versioned assets, a 60-second stale window causes JS errors: users get the old HTML referencing old asset URLs, but those old files have already been overwritten. The correct fix is: HTML files at short TTL or event-driven purge; static assets at long TTL with versioned filenames.',
+  },
+  {
+    question: 'What is the thundering herd problem in CDN contexts and what are the two mechanisms that prevent it?',
+    intent: 'Whether you understand the failure mode precisely — the simultaneous expiry cascade — and can name both request coalescing and origin shield as complementary solutions.',
+    answer:
+      'Thundering herd occurs when a cached key expires — not a random miss, but a simultaneous expiry: all edge nodes had the same TTL, so they all evict the entry at the same second. If that URL is popular (a homepage, a trending video), every user request in the next few milliseconds becomes a cache miss, and all fire simultaneously to origin. With 300 PoPs each forwarding 1,000 requests, origin receives 300,000 requests at once — a self-inflicted DDoS. Two mechanisms prevent it: (1) Origin shield — a single regional tier-2 cache between all edge PoPs and origin. All 300 PoP misses route to the shield first. The shield makes at most one origin request. This prevents N simultaneous origin contacts regardless of request volume. (2) Request coalescing — within a single PoP, if 10,000 simultaneous requests all miss for the same URL, the edge sends one request to upstream and holds the other 9,999. When the response arrives, it fans out to all waiting requests. Cloudflare calls this "request collapsing." These are complementary: origin shield prevents cross-PoP thundering herd; request coalescing prevents per-PoP thundering herd.',
+    trap:
+      'Saying "add jitter to TTL" as the primary solution. TTL jitter (randomising expiry times slightly) reduces the probability of simultaneous expiry but does not eliminate it at scale. It also complicates TTL reasoning. Origin shield is the architecturally correct solution — it changes the cardinality of origin requests from O(PoPs × requests) to O(1) regardless of how synchronized the expiry is.',
+  },
+  {
+    question: 'What is the difference between a pull CDN and a push CDN? When would you use each for a video streaming service?',
+    intent: 'Architectural decision-making — whether you can reason about the tradeoff between cold-start miss latency and pre-positioning cost at scale.',
+    answer:
+      'Pull CDN: content is fetched from origin the first time any user requests it from a given PoP, then cached. Simple to operate — no pre-positioning logic needed. Cold start latency: the first user at each PoP pays the full origin round trip. Works well for websites, APIs, and any content where the request distribution is uneven (most URLs are rarely requested). Push CDN: content is pre-positioned to all PoPs before any user requests it. Publisher pushes content proactively, typically via a CDN API or sync job. Zero cold-start latency. Storage cost: every PoP stores every piece of pushed content regardless of demand. For a video streaming service: push CDN for the top 5% of titles that will be watched by millions simultaneously (Netflix pre-positions popular titles to Open Connect appliances overnight). Pull CDN for the long tail (95% of catalog that rarely streams) — pre-positioning those titles to 330 PoPs would waste petabytes of storage for content nobody in most regions ever requests. The implementation is a hybrid: predict popularity using historical viewing data, push the predicted top titles, let the rest be pull-cached.',
+    trap:
+      'Saying "always use push CDN for video because it\'s faster." Push CDN has a hard scaling limit: you cannot pre-position 10 TB of new daily content to 300 PoPs simultaneously — the bandwidth for the push itself becomes the bottleneck. Netflix solves this by doing the push overnight when traffic is low, and only for content predicted to be popular in each region. Push CDN also has a freshness problem: if you push content and then need to update it (fixing metadata, replacing a corrupted segment), every PoP must be updated. Pull CDN with proper TTLs is self-healing.',
+  },
+  {
+    question: 'How does the Vary response header affect CDN caching and what is the most common mistake with it?',
+    intent: 'Whether you know the mechanism that destroys CDN cache hit rates on HTTPS APIs — extremely common production issue, rarely understood.',
+    answer:
+      'The Vary header tells CDNs that the response content varies based on the listed request headers — meaning the CDN must store a separate cache entry for each unique combination of those header values. Vary: Accept-Encoding is benign: it tells the CDN to cache separately for gzip, brotli, and uncompressed responses — three entries per URL, all manageable. Vary: Cookie is catastrophic: every unique Cookie header creates a separate cache entry. Since session cookies are unique per user, this means effectively zero cache hits — every request bypasses the cache. Vary: Authorization has the same effect. The most common mistake: an upstream service (a WAF, an authentication middleware, or a framework) silently adds Vary: Cookie or Vary: Authorization to all responses, including responses for public, unauthenticated assets. The CDN then stores no shared entries — it thinks every request is unique. You discover this in production when your CDN dashboard shows a 0.1% hit rate for a page you expected at 90%+. Fix: explicitly set Vary: Accept-Encoding, Accept and nothing else for public cacheable responses. Strip or override Vary before responses leave origin for public assets.',
+    trap:
+      'Thinking Vary: Authorization means "don\'t cache authorised responses." It means "cache separately per Authorization header value." In practice this means one cache entry per token — effectively infinite cache entries, none ever reused. The correct approach for personalised, authorised content is Cache-Control: no-store or a private CDN cache segment, not Vary: Authorization.',
+  },
+  {
+    question: 'How does TLS termination at the CDN edge work and what are the security implications?',
+    intent: 'Whether you understand the trust model when a CDN terminates TLS — specifically that the CDN sees all plaintext traffic, and the origin-to-CDN leg has different security properties.',
+    answer:
+      'TLS termination at the edge means the CDN decrypts the user\'s HTTPS connection, inspects the plaintext request, and then forwards it to origin — typically over a separate TLS connection within the CDN\'s backbone (sometimes called "re-encryption" or "full tunnel"). The security implication: the CDN is a man-in-the-middle by design. Cloudflare, Fastly, and Akamai can read the decrypted plaintext of every request passing through them. This is acceptable for most web content but requires careful evaluation for: regulated data (HIPAA, PCI DSS — does your compliance scope include the CDN operator?), authentication tokens in headers (CDN sees them), and request bodies (a POST with a password in the body is visible to the CDN). On the origin-to-CDN leg: the CDN forwards using its own TLS certificates, not the user\'s session. Mutual TLS between origin and CDN ensures only the CDN can contact the origin. Without it, anyone who discovers your origin IP can bypass the CDN and potentially the WAF rules it enforces. "Origin IP protection" — keeping origin IPs secret — is a necessary operational control, not a paranoid one.',
+    trap:
+      'Assuming that because the user sees a padlock (HTTPS), the traffic is end-to-end encrypted from user to origin. It is not — TLS terminates at the CDN edge. The padlock means the user-to-edge leg is encrypted. The edge-to-origin leg is a separate connection under the CDN\'s control. For most web traffic this is fine. For traffic that should never be decrypted by any intermediary (private key material, medical records being downloaded), a CDN is architecturally inappropriate — use direct TLS with pinning.',
+  },
+  {
+    question: 'Back of the envelope: size the CDN bandwidth for a video platform with 50M daily active users. At what point would you negotiate custom CDN pricing instead of paying public rack rates?',
+    intent: 'Whether you can drive bandwidth math and understand the commercial leverage that scale creates — this is the "design meets business" question that distinguishes senior from mid-level answers.',
+    answer:
+      'Sizing: 50M daily active users. Assume peak concurrency = 10% = 5M concurrent streams. Average bitrate for a mixed SD/HD/4K library: ~6 Mbps. Peak bandwidth: 5M × 6 Mbps = 30 Tbps. Daily data transferred: 30 Tbps / 8 = 3.75 TB/s × 86,400 s = 324,000 TB/day ≈ 324 PB/day. CDN public rack rate: ~$0.008/GB = $8/TB. Daily cost at public rates: 324,000 TB × $8 = $2.59M/day ≈ $945M/year. Custom pricing trigger: any customer transferring more than ~5 PB/month can negotiate volume discounts with Cloudflare, Fastly, or Akamai. At 324 PB/day, you have enormous leverage — typically negotiate 40–70% below rack rate, and simultaneously consider building peering agreements with major ISPs (like Netflix Open Connect) to bypass CDN egress entirely for the most popular content. At 30 Tbps peak, your traffic is significant enough that ISPs will accept your appliances for free to reduce their own upstream transit costs.',
+    trap:
+      'Stopping at the bandwidth calculation without mentioning cache hit rate. If cache hit rate is 90%, only 10% of traffic actually reaches origin — but 100% of egress bandwidth is still billed by the CDN, because CDN billing is on outbound to users, not on origin fetches. The bandwidth number IS the CDN cost driver — you pay for all 324 PB/day regardless of hit rate. Hit rate affects origin cost (compute, storage, origin egress), not CDN egress cost.',
+  },
+]
+
+export function CdnQA() {
+  return <InterviewQAAccordion items={ITEMS} />
+}

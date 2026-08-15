@@ -174,7 +174,7 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
 | Section | Heading text | Anchor ID |
 |---|---|---|
 | 1 | ELI5 Foundation | `#eli5` |
-| 2 | FAANG Deep-Dive | `#deep-dive` |
+| 2 | Big Tech Deep-Dive | `#deep-dive` |
 | 3 | Implementation | `#implementation` |
 | 4 | Database & API Schema | `#schema` |
 | 5 | Visual Aids & Animations | `#animations` |
@@ -274,7 +274,7 @@ Static anchor links to the 7 sections. Sticks to the top of the viewport while s
 
 const SECTIONS = [
   { id: 'eli5',           label: 'ELI5 Foundation' },
-  { id: 'deep-dive',      label: 'FAANG Deep-Dive' },
+  { id: 'deep-dive',      label: 'Big Tech Deep-Dive' },
   { id: 'implementation', label: 'Implementation' },
   { id: 'schema',         label: 'DB & API Schema' },
   { id: 'animations',     label: 'Animations' },
@@ -655,7 +655,7 @@ prerequisites: []
 
 _Content coming in Phase 03._
 
-## FAANG Deep-Dive {#deep-dive}
+## Big Tech Deep-Dive {#deep-dive}
 
 _Content coming in Phase 03._
 
@@ -754,7 +754,7 @@ The `prose prose-neutral dark:prose-invert` classes on the `<article>` in Step 4
 - [x] `src/components/animations/StepThrough.tsx` — `AnimatePresence` slide transitions, Previous/Next buttons (44×44px), step counter, progress dots, per-step colour support
 - [x] `src/components/animations/Interactive.tsx` — discriminated union `ControlDef` (SliderInput / SelectInput / ToggleInput), `useMemo` for stable defaults, render prop pattern for TSX composition
 - [x] `src/components/animations/Comparative.tsx` — left/right panels with render props (each panel receives `AnimationOptions`), responsive (column on mobile, row on desktop)
-- [x] 14 MDX skeleton files created with complete frontmatter and 7 plain-markdown section headings (`## ELI5 Foundation`, `## FAANG Deep-Dive`, `## Implementation`, `## Schema`, `## Animations`, `## Common Mistakes`, `## Interview Prep`)
+- [x] 14 MDX skeleton files created with complete frontmatter and 7 plain-markdown section headings (`## ELI5 Foundation`, `## Big Tech Deep-Dive`, `## Implementation`, `## Schema`, `## Animations`, `## Common Mistakes`, `## Interview Prep`)
 - [x] All 14 topic pages render without error — `npm run build` generates 18/18 static routes
 - [x] Shiki dual-theme CSS variables added to `globals.css` — `--shiki-light`/`--shiki-dark` toggled by `.dark` class from `next-themes`
 - [ ] Code blocks render with syntax highlighting verified in browser (dark and light theme)
@@ -764,7 +764,7 @@ The `prose prose-neutral dark:prose-invert` classes on the `<article>` in Step 4
 - [x] `npm run build` passes — 18/18 static routes generated, zero TypeScript errors
 
 ### Implementation notes
-- **`{#id}` shorthand is invalid MDX** — MDX parses `{...}` as a JS expression. Section anchor IDs come from `slugify(headingText)` in MDXComponents. TOC IDs were updated to match (`eli5-foundation`, `faang-deep-dive`, etc.).
+- **`{#id}` shorthand is invalid MDX** — MDX parses `{...}` as a JS expression. Section anchor IDs come from `slugify(headingText)` in MDXComponents. TOC IDs were updated to match (`eli5-foundation`, `Big Tech-deep-dive`, etc.).
 - **`@shikijs/rehype@4.x` has default export only** — confirmed via `node -e "require('@shikijs/rehype')"`. Import as `import rehypeShiki from '@shikijs/rehype'`, not named import.
 - **Turbopack + `next-mdx-remote`** — MDX compiles in RSC server context, completely outside Turbopack's module graph. No Turbopack serialization constraint applies.
 - **Static generation timeout** — Shiki + MDX compilation during `next build` (6-worker static generation) causes 60s timeouts on first attempt; Next.js retries automatically and all 18 routes eventually succeed. Not an error.

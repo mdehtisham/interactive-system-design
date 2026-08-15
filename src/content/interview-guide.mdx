@@ -1,0 +1,293 @@
+# System Design Interview Framework
+
+---
+
+## The 6-Step Framework
+
+
+The diagram below shows the 6 steps in sequence. Step 4 (Data Flow) has a dashed border in many representations because it is the step most candidates skip — they describe what components exist but never trace how a real request actually moves through them.
+
+Click any step box to read what it requires and what questions you should be asking.
+
+<InterviewFrameworkSteps />
+
+**Total time budget: ~38 minutes** for a 45-minute interview, leaving 7 minutes for interviewer questions. The distribution matters: most candidates spend too long on High-Level Design (drawing every box perfectly) and too little on Requirements and Deep Dives — which are where differentiation actually happens.
+
+---
+
+## Real World Example: Rate Limiter
+
+> "Design a rate limiter for our API platform. It needs to support multiple clients, configurable limits, and work correctly when deployed across multiple servers."
+
+This question appears regularly at Stripe, Google, Uber, and Meta infrastructure rounds. It is deliberately open-ended — your first job is Step 1.
+
+---
+
+## Step 1: Requirements
+
+**What it is:** A structured conversation, not a monologue. You ask; the interviewer clarifies. This is not lost time — it is where 10/10 candidates demonstrate systems thinking before touching any architecture.
+
+**Framework:** Split every requirements discussion into four sections:
+
+1. **Functional requirements** — what must the system *do*?
+2. **Non-functional requirements** — how must it *behave* at scale?
+3. **Back-of-the-envelope estimation** — how big is the problem?
+4. **Out of scope** — what are you explicitly *not* building?
+
+### Animation 1 — Requirements Applied to Rate Limiter
+
+Step through each section of a complete requirements answer. Every panel is what a 10/10 candidate covers before drawing a single box.
+
+<RlRequirementsSteps />
+
+### Back-of-the-Envelope
+
+| Metric | Value | Notes |
+|---|---|---|
+| Registered users | 10M | Given |
+| Avg requests/user/day | 100 | Assumption — confirm with interviewer |
+| Daily requests | 1B | 10M × 100 |
+| Avg RPS | ~11,574 | 1B ÷ 86,400 |
+| Peak RPS (10× avg) | ~115,740 | Typical peak factor |
+| Redis counter size | ~50 bytes | Per active counter entry |
+| Redis storage | ~500 MB | 10M users × 50 bytes |
+| Redis single-node ops | ~100K/s | Standard Redis throughput |
+| Redis nodes needed | 2–3 | With cluster for 115K ops/s |
+
+> **Math check — daily requests:**
+> `10M users × 100 req/user/day = 1,000,000,000 requests/day`
+> `1,000,000,000 ÷ 86,400 seconds = 11,574 RPS average`
+> Peak factor 10×: `11,574 × 10 = 115,740 RPS`
+
+---
+
+## Step 2: Core Entities
+
+**What it is:** Before writing any API, name the things your system stores and reasons about. These are your data model. Three to five entities is ideal — fewer and you've missed something; more and you're in the weeds.
+
+**Framework:** For each entity: what fields does it hold? For each pair: what is the relationship and cardinality? This step forces you to reason about data before behaviour — which exposes ambiguities that would otherwise appear as bugs in Step 5.
+
+### Applied to Rate Limiter
+
+Three entities cover the entire rate limiter:
+
+**CLIENT** — who is being limited
+- `client_id` — unique identifier (user ID or API key hash)
+- `tier` — free, starter, enterprise (determines which rules apply)
+- `ip_address` — fallback identifier for unauthenticated requests
+
+**RATE_LIMIT_RULE** — what the limit is
+- `tier` — which client tier this rule applies to
+- `endpoint_pattern` — `/api/*` or `/api/auth/*` (more specific rules override general)
+- `request_limit` — maximum requests allowed in the window
+- `window_seconds` — the time window (3600 = hourly, 86400 = daily)
+
+**RATE_COUNTER** — the current state (lives in Redis, not MongoDB — it's ephemeral)
+- `client_id` + `rule_id` — composite key identifying what's being counted
+- `count` — current request count in the active window
+- `expires_at` — Redis TTL handles this automatically
+
+### Diagram 1 — Entity Relationships
+
+<RlErDiagram />
+
+---
+
+## Step 3: API / Interface
+
+**What it is:** Define how clients interact with your system. For a service: HTTP endpoints, verbs, and shapes. For middleware (which rate limiting is): the function signature and the observable side effects — the headers the client receives.
+
+**Framework:** The rate limiter is middleware, not a public-facing API. Its "interface" has two faces:
+- **The middleware interface** — the function that runs on every request
+- **The response headers** — how the client knows its quota state
+
+### Response Headers (the client-visible interface)
+
+```http
+HTTP/1.1 200 OK
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 847
+X-RateLimit-Reset: 1753660800
+
+HTTP/1.1 429 Too Many Requests
+Retry-After: 3412
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 1753660800
+```
+
+### Management API (for configuring rules)
+
+```ts
+// Create or update a rate limit rule
+POST /api/v1/rate-limits/rules
+{
+  "tier": "free",
+  "endpoint_pattern": "/api/*",
+  "request_limit": 100,
+  "window_seconds": 3600
+}
+// → 201 Created: { "rule_id": "rl_abc123", ... }
+
+// Check a client's current state
+GET /api/v1/rate-limits/{clientId}/status
+// → 200: { "remaining": 47, "resets_at": 1753660800, "limit": 100 }
+
+// Admin reset (for support/testing)
+DELETE /api/v1/rate-limits/{clientId}/reset
+// → 200: { "cleared": true }
+```
+
+### Diagram 2 — API Middleware Flow
+
+<RlApiFlowDiagram />
+
+---
+
+## Step 4: Data Flow
+
+**What it is:** Trace a single real request end-to-end through the system. Start at the client. Name every layer it passes through. End at the response. Every arrow must have a reason. This is the step that turns a plausible architecture into a demonstrably working one.
+
+**Framework:** Choose one representative request — the most common case, not an edge case. Trace it through your architecture from Step 5. If you cannot trace it completely, you have a gap.
+
+### Applied to Rate Limiter
+
+Trace: `GET /api/v1/posts` with API key `key_abc123`, user on free tier (limit: 100/hour)
+
+1. Client sends `GET /api/v1/posts` with `Authorization: Bearer key_abc123`
+2. API Gateway receives the request; auth middleware validates the API key → resolves to `client_id: user_789`
+3. Rate limiter middleware looks up the applicable rule: free tier, `/api/*`, 100/hour
+4. Redis: `INCR rate:user_789:posts:2025061214` (key format: `rate:{client_id}:{endpoint_hash}:{window_hour}`)
+   - If the key did not exist: INCR creates it at 1 and sets TTL to 3600 seconds
+   - Returns: `47` (forty-seventh request this hour)
+5. `47 <= 100` → allowed. Middleware adds headers: `X-RateLimit-Remaining: 53`, `X-RateLimit-Reset: {next_hour_unix}`
+6. Request forwarded to Posts service → `200 OK` with response body and rate limit headers
+
+**Rejection path:** If Redis returns `101 > 100`: middleware returns `429 Too Many Requests` immediately with `Retry-After: {seconds_until_window_reset}`. Posts service never sees the request.
+
+### Animation 2 — Data Flow Through the Rate Limiter
+
+<RlTokenBucketFlow />
+
+---
+
+## Step 5: High-Level Design
+
+**What it is:** Now draw the architecture. Boxes are services, databases, caches, queues. Arrows have protocols and directions. Use your entities from Step 2 to justify storage choices. Name real technologies with rationale — "Redis because it has sub-millisecond latency and atomic INCR" beats "a cache."
+
+**Framework:** Cover three views:
+1. **The request path** (what happens on every API call)
+2. **The data path** (how data is stored and read)
+3. **The control plane** (how rules are configured and pushed to the gateway)
+
+### Applied to Rate Limiter
+
+**Request path:** Client → Load Balancer → API Gateway (rate limiter middleware + Redis INCR) → Backend Service
+
+**Data path:** Rate counters in Redis (TTL-keyed, ephemeral). Rate rules in MongoDB (durable, admin-configurable). Gateway caches rules in memory (refreshed every 60s) so rule lookups don't add a Redis round trip.
+
+**Control plane:** Admin configures rules via the management API → MongoDB. Gateway processes poll for rule changes every 60 seconds and hot-reload the in-memory cache.
+
+**Why Redis for counters, not MongoDB or PostgreSQL?** Redis INCR is atomic and runs in ~0.1ms. A MongoDB `findAndModify` runs in ~2–5ms — too slow to add to every API request. The 10ms overhead budget leaves no room for slower storage.
+
+### Diagram 3 — High-Level Architecture
+
+<RlSystemDiagram />
+
+---
+
+## Step 6: Deep Dives
+
+**What it is:** Proactively raise the core engineering challenge before the interviewer asks. For rate limiting, there are two: the algorithm choice (which one and why) and the distributed race condition (how to keep counts accurate across multiple servers).
+
+**Framework:** Do not wait to be asked. Raising the hard problem unprompted is the single biggest signal that separates 10/10 candidates. A candidate who describes the architecture perfectly but waits for the interviewer to raise the race condition has demonstrated awareness of components but not of distributed systems complexity.
+
+### Deep Dive 1 — Algorithm Choice
+
+Five algorithms exist. Knowing all five — and when each breaks — is the differentiated answer.
+
+| Algorithm | Storage | Burst | Accuracy | Best For |
+|---|---|---|---|---|
+| **Fixed Window** | O(1) — one counter | ✓ at boundary | Poor — 2× burst at window edge | Simple use cases, not production |
+| **Sliding Window Log** | O(N) — one timestamp per request | ✗ strict | Perfect | Low-volume, very precise requirements |
+| **Sliding Window Counter** | O(1) — two counters | Partial | ~98% — approximation | Most production APIs |
+| **Token Bucket** | O(1) — one counter | ✓ controlled | Good | APIs needing burst tolerance |
+| **Leaky Bucket** | O(1) — one counter | ✗ strict | Good | Smooth output rate required (billing, SMS) |
+
+**The recommended answer for most interview scenarios:** Token bucket. Allows controlled bursts (a user can temporarily exceed the average rate if their bucket is full), smooth over time, O(1) storage, and trivially implementable in Redis with a single INCR plus a TTL.
+
+**The interviewer trap:** Saying "I'd use token bucket because it's smooth" without mentioning what happens to the token refill in a distributed environment — see Deep Dive 2.
+
+### Animation 3 — Token Bucket vs Sliding Window Counter
+
+<RlAlgorithmComparative />
+
+### Deep Dive 2 — Distributed Race Condition
+
+The core distributed challenge: **two servers reading the same counter simultaneously**.
+
+```
+Server A: GET rate:user_789 → 99 (one below limit)
+Server B: GET rate:user_789 → 99 (same value, same time)
+
+Server A: SET rate:user_789 100 → allowed ✓
+Server B: SET rate:user_789 100 → allowed ✓
+
+Actual requests sent to backend: 2
+But counter shows: 100 (not 101)
+```
+
+The root cause: GET + SET is not atomic. Between the read and the write, another server can interleave.
+
+**Fix 1: Use Redis INCR (atomic).** Redis's INCR command atomically increments and returns the new value in a single operation. No interleaving possible.
+
+```ts
+const count = await redis.incr(`rate:${clientId}:${windowKey}`)
+if (count === 1) await redis.expire(`rate:${clientId}:${windowKey}`, windowSeconds)
+if (count > limit) return res.status(429).json({ error: 'rate limit exceeded' })
+```
+
+**Edge case:** INCR + EXPIRE is still two commands. A server could crash between them — the key would never expire. Fix: use a Lua script to make the entire operation atomic:
+
+```lua
+-- Atomic rate check in Lua (runs as a single Redis operation)
+local key     = KEYS[1]
+local limit   = tonumber(ARGV[1])
+local ttl     = tonumber(ARGV[2])
+local count   = redis.call('INCR', key)
+if count == 1 then
+  redis.call('EXPIRE', key, ttl)
+end
+return count
+```
+
+This Lua script executes atomically — no other Redis command runs between INCR and EXPIRE. This eliminates both the race condition and the orphaned-key risk.
+
+**Fix 2 (advanced): Redis Cluster with consistent hashing.** Ensure all requests for the same `client_id` route to the same Redis shard. This avoids cross-shard coordination for a single client's counter. Redis Cluster handles this automatically using hash slots — a `{}` in the key (`rate:{user_789}:window`) pins all keys for the same user to the same slot.
+
+---
+
+## Timing Guide
+
+| Step | Budget | Exit Signal |
+|---|---|---|
+| Requirements | ~5 min | You've stated functional, non-functional, scale estimate, and out-of-scope |
+| Core Entities | ~3 min | You've named 3–5 entities with fields and relationships |
+| API / Interface | ~5 min | You've defined endpoints or middleware contract + response shapes |
+| Data Flow | ~5 min | You've traced one real request end-to-end through every layer |
+| High-Level Design | ~10 min | Interviewer says "looks good" or starts asking deep dive questions |
+| Deep Dives | ~10 min | You've proactively covered the core hard problem; interviewer is satisfied |
+
+---
+
+## Common Mistakes
+
+1. **Jumping straight to the architecture.** The most common mistake — starting to draw boxes before asking any clarifying questions. Interviewers give lower scores even if the final design is correct, because the process signalled that you would do the same on a real team: build first, discover requirements late.
+
+2. **Skipping Data Flow (Step 4).** Without tracing a real request, your architecture is a set of boxes that might work. With the trace, it either works or you discover the gap. Most failed interviews include a design that sounds plausible but has a silent failure: data that has no path to its destination, or a service that's described but never connected.
+
+3. **Not proactively raising the hard problem.** Waiting for the interviewer to ask "but what about distributed consistency?" costs 3 points immediately. The interviewer already knows the hard problem — they are waiting to see if you do. Raising it unprompted is the single most reliable differentiator between 7/10 and 10/10 feedback.
+
+4. **Naming the algorithm without knowing its failure modes.** "I'd use token bucket" is a 6/10 answer. "I'd use token bucket because it allows controlled bursts, has O(1) storage, and is implementable atomically in Redis with INCR — the race condition between INCR and EXPIRE is solvable with a Lua script" is a 10/10 answer. Every technology choice should be followed by its trade-off.
+
+5. **Sizing without showing the math.** "Redis is fast enough" is not an answer. "We need ~115K ops/second at peak; Redis single-node handles ~100K, so we need a 2–3 node cluster with hash-slot-based sharding for our client keys" is an answer. The interviewer is testing whether you know where the limits are, not just that limits exist.

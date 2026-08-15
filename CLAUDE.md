@@ -14,12 +14,42 @@ All confirmed bugs and their fixes are tracked in `issues_and_fixes.md` at the
 project root. Every rule below was learned the hard way — violating them will
 reproduce the exact same bugs in new components.
 
+### CSS Variables and Color Classes
+
+- **Never write** `hsl(var(--anything))` in inline styles — the CSS variables in
+  this project are defined as hex values (`--foreground: #111827`), not HSL
+  component triplets. `hsl(#111827)` is invalid CSS and the browser silently
+  ignores the entire declaration. Use `var(--foreground)` directly (no `hsl()`
+  wrapper) when you must use a CSS variable in an inline style.
+- **Never rely on `bg-muted`, `text-muted-foreground`, `bg-accent`, `border-border`
+  etc. for elements where the Tailwind v4 prose plugin can override them** (table
+  cells, headings, etc.). The prose plugin uses high-specificity `:where()` selectors.
+  For these elements, use the explicit CSS classes defined in `globals.css`:
+  - `ui-table-header` — table `<th>` cells (slate-100 bg + slate-900 text / zinc-800 + zinc-100 dark)
+  - `ui-code-label` — code block language label (gray-700 / gray-300 dark)
+  Add new `ui-*` classes to `globals.css` with `!important` whenever you need
+  a color that must survive prose or other high-specificity overrides.
+
 ### Colors
 
-- **Never** use `bg-accent` or `hover:bg-accent` for interactive states —
-  `--accent` resolves to near-white in the default shadcn neutral light theme
-  and produces invisible feedback. Use explicit Tailwind palette classes instead:
-  `bg-blue-50 text-blue-700` (active), `hover:bg-gray-50` (hover).
+- **Never** use `bg-accent`, `hover:bg-accent`, or `hover:text-accent-foreground`
+  for any interactive state — `--accent` resolves to near-white in the default
+  shadcn neutral light theme, making hover feedback invisible. This applies to
+  **all** components including `Button` variants (outline, ghost), icon buttons,
+  tab selectors, and any element with a hover state. Always use explicit Tailwind
+  palette classes: `hover:bg-gray-100 dark:hover:bg-zinc-700 hover:text-gray-900
+  dark:hover:text-zinc-100` for hover, `hover:bg-gray-200 dark:hover:bg-zinc-600`
+  for more visible emphasis.
+- **Never** use `text-muted-foreground` or `color: hsl(var(--muted-foreground))`
+  for labels, table headers, button text, or any actionable / important UI text —
+  `--muted-foreground` resolves to a very light grey (~46% lightness) that is
+  barely readable on white backgrounds. Reserve `text-muted-foreground` for
+  truly secondary/decorative text (captions, timestamps, empty-state hints).
+  For table headers and button labels always use `text-foreground` or explicit
+  palette classes (`text-zinc-700 dark:text-zinc-300`).
+- **Always** add `active:scale-[0.97] transition-[colors,transform]` to clickable
+  buttons and icon buttons — the press animation provides critical feedback that
+  a click registered. Without it, buttons feel broken on both desktop and touch.
 - Badge/tag styles must follow `bg-*-100 text-*-900` (light) /
   `bg-*-500/10 text-*-400` (dark). Never use ring-based badges.
 - Always add `prose-p:text-foreground prose-li:text-foreground prose-td:text-foreground`
@@ -36,6 +66,17 @@ reproduce the exact same bugs in new components.
   string contains `{` or `}`. MDX's JSX parser treats `{` as a JS expression
   boundary, delivering `undefined` as the prop. Always put chart strings in a
   TypeScript wrapper component as a module-level `const`.
+- **Never** write a Mermaid diagram as a fenced code block (` ```mermaid `) in
+  MDX. Fenced code blocks render as a plain `<code>` element — the diagram is
+  never parsed or drawn. Every Mermaid diagram must be a named component in
+  `src/components/diagrams/` that wraps `<MermaidDiagram chart={CHART} />`,
+  with the chart string as a module-level `const`. The component is then
+  referenced in MDX as `<MyDiagramName />` with no inline string.
+- **Every new diagram or animation component used in MDX must be registered in
+  `src/components/mdx/MDXComponents.tsx`** — both an `import` line at the top
+  and an entry in the `mdxComponents` object. Omitting either causes a 500
+  error: "Expected component `X` to be defined." Always update this file
+  immediately after creating a new component, before testing in the browser.
 
 ### Tooltips and Popovers
 
@@ -51,9 +92,9 @@ reproduce the exact same bugs in new components.
 
 ## Project Purpose
 
-An open-source, interactive system design learning platform that teaches FAANG-tier distributed systems concepts visually — through live code, production-grade schemas, Mermaid.js diagrams, Framer Motion animations, and interview prep. Built with Next.js, Node.js, Express.js, and MongoDB.
+An open-source, interactive system design learning platform that teaches Big Tech-tier distributed systems concepts visually — through live code, production-grade schemas, Mermaid.js diagrams, Framer Motion animations, and interview prep. Built with Next.js, Node.js, Express.js, and MongoDB.
 
-**Primary user:** A Primary user is Fronend/backend developer having 3-5 years of experience transitioning to Full Stack (MERN/MEAN) and targeting FAANG-level roles. Explanations should bridge backend/distributed systems concepts to frontend mental models where possible.
+**Primary user:** A Primary user is Fronend/backend developer having 3-5 years of experience transitioning to Full Stack (MERN/MEAN) and targeting Big Tech-level roles. Explanations should bridge backend/distributed systems concepts to frontend mental models where possible.
 
 ---
 
@@ -161,7 +202,7 @@ This platform covers **both** High-Level Design and Low-Level Design — in a fi
 - Distributed systems concepts (caching, sharding, load balancing, rate limiting, CAP theorem)
 - System-level Mermaid flowcharts (`Client → CDN → Load Balancer → Microservice → DB`)
 - Trade-off tables, back-of-the-envelope estimations (QPS, storage, bandwidth)
-- FAANG-style interview answers — the system design interview round tests almost exclusively at HLD level
+- Big Tech-style interview answers — the system design interview round tests almost exclusively at HLD level
 
 **LLD follows immediately, grounded in the HLD:**
 - The actual Next.js/Node/Express code implementing the concept
@@ -170,7 +211,7 @@ This platform covers **both** High-Level Design and Low-Level Design — in a fi
 
 **The platform's differentiator:** most system design resources stop at HLD (boxes and arrows). Here, every HLD concept is immediately followed by working LLD — real schemas, real endpoints, real animations — so learners understand not just what the architecture looks like, but how to build it.
 
-**FAANG interview mapping:**
+**Big Tech interview mapping:**
 | Interview Round | Design Type | What This Platform Covers |
 |---|---|---|
 | System Design Round | HLD | Distributed concepts, trade-offs, estimations |
@@ -207,20 +248,30 @@ If a user lands on a topic they aren't ready for, the prerequisites block is the
 
 1. **ELI5 Foundation** — explain the concept as if explaining to a curious 10-year-old who has never heard of it. Lead with a real-world analogy that is relatable (food, traffic, toys, school) before introducing any technical term. Keep it under 5 sentences. This section exists even for the most advanced topics — if you cannot explain Database Sharding simply, the explanation is not ready. The technical term is introduced at the *end* of the analogy, not the beginning.
 
-2. **FAANG Concept Deep-Dive** — explain the concept in the context of large-scale distributed systems (e.g., how Netflix uses caching, how Google handles sharding). Reference real systems by name.
+2. **Big Tech Concept Deep-Dive** — explain the concept in the context of large-scale distributed systems (e.g., how Netflix uses caching, how Google handles sharding). Reference real systems by name.
 
-3. **Next.js Implementation** — working code demonstrating the pattern in this app (API route, server component, or client component as appropriate).
+3. **`## Implementation`** — the LLD section. Three required sub-sections, always in this order:
 
-4. **Database & API Schema** — Mongoose model + Express/Next.js controller endpoints, plus:
-   - **Mermaid ER diagram** showing all collections/tables involved, their fields, and the relationships between them (foreign keys, embedded docs, references). Example:
-     ```
-     erDiagram
-       USER ||--o{ SESSION : has
-       SESSION ||--|{ REQUEST : logs
-       USER { string id, string email }
-       SESSION { string id, string userId, date createdAt }
-     ```
-   - **Data flow diagram** — a separate Mermaid flowchart tracing exactly how a request reads/writes through these schemas step by step (e.g., `API Route → check cache → query DB → write result to cache → return response`).
+   **`### Schema Design`** — Mongoose model with its TypeScript interface (`IModelName extends Document`). Every field explained inline: why it exists, its type, its constraints. Indexes declared at the model level with a one-line comment stating which query they serve. For foundational topics with no application DB model (e.g., How the Web Works), this sub-section is omitted — the Schema section's Entity Relationships diagram serves as the data structure reference instead.
+
+   **LLD layering — always apply this pattern:**
+   ```
+   Route (express.Router)  →  maps URL + HTTP verb to a controller function
+   Controller (thin)       →  parse req, call service, return res; zero business logic
+   Service (/lib)          →  business logic, validation, DB calls; testable in isolation
+   Model (Mongoose)        →  schema + TypeScript types only; zero business logic
+   ```
+   Apply Single Responsibility throughout: one file, one concern. Controllers that contain conditional logic or DB calls directly are doing too much — move that to the service layer.
+
+   **`### API Contract`** — Express controller functions (one per HTTP verb) with correct status codes, error branches, and response shapes. Followed by the router file showing the URL → middleware → controller chain.
+
+   **`### Data Flow`** — a Mermaid flowchart component tracing one complete real request (e.g., `POST /api/v1/posts`) through every code layer: client → route → middleware → controller → service → model → DB → response. Every arrow labelled. Shows the happy path and the first failure branch (e.g., 404 on DB miss).
+
+4. **`## Schema`** — visual companions to the Implementation section. Two required sub-sections:
+
+   **`### Entity Relationships`** — Mermaid ER diagram via a named component (e.g., `<ApiErDiagram />`). Every collection, every field, and every relationship shown with cardinality and embed-vs-reference decision annotated.
+
+   **`### Request Data Flow`** — Mermaid data-flow diagram component showing the same request as Implementation's Data Flow, but at the infrastructure level (CDN → LB → service → cache → DB) rather than the code-function level. The two views complement each other: Implementation shows the code path; Schema shows the system path.
 
 5. **Visual Aids & Animations (maximum coverage required):**
 
@@ -270,7 +321,23 @@ If a user lands on a topic they aren't ready for, the prerequisites block is the
 
 6. **Common Mistakes** — 3–5 bullet points on what developers get wrong when implementing or designing this concept. Pitched at someone learning it for the first time.
 
-7. **Interview Prep** — FAANG-style answer outline including back-of-the-envelope estimation (QPS, storage, bandwidth). Include a sample question and a structured answer template.
+7. **Interview Prep** — Big Tech-style answer outline including back-of-the-envelope estimation (QPS, storage, bandwidth). Include a sample question and a structured answer template.
+
+   **Follow-up Questions — required format (non-negotiable):**
+   Never write follow-up questions as a plain bullet list. Every topic must end its Interview Prep section with an `<InterviewQAAccordion>` powered by a topic-specific wrapper component. Each question must have all four fields:
+
+   ```ts
+   {
+     question: string   // exactly as an interviewer would ask it
+     intent:   string   // one sentence: what the interviewer is actually probing for
+     answer:   string   // the model answer — what a 10/10 Big Tech response sounds like
+     trap?:    string   // the specific mistake most candidates make on this question
+   }
+   ```
+
+   The wrapper component lives in `src/components/interview/topics/<TopicName>QA.tsx` with the data as a module-level `const ITEMS: QAItem[]`. Register it in `MDXComponents.tsx`. Reference it in the MDX file as `<TopicNameQA />` after the instruction "Think through your answer before revealing it."
+
+   Rationale: a plain bullet list of questions is useless for learning — the candidate reads the question, has no way to self-assess, and moves on with zero retention. The accordion enforces active recall (candidate thinks before revealing), surfaces the interviewer's hidden intent, provides a model answer to calibrate against, and highlights the specific trap that eliminates most candidates.
 
 ---
 
@@ -304,6 +371,58 @@ Before marking a topic as done and moving to the next:
 ### Implementation order
 
 Follow the sequence in `TOPICS.md` exactly — the prerequisite chain is the implementation order. Never skip ahead. If a later topic seems simpler, it still waits.
+
+---
+
+## Interview Prep Standards
+
+Every Interview Prep section **must** meet these standards before a topic is marked complete. These rules exist because wrong numbers or missing core challenges are immediately disqualifying in a real Big Tech interview.
+
+### Back-of-the-Envelope — Math Rules (Non-Negotiable)
+
+**Always verify arithmetic step by step. Never write a storage or bandwidth number from memory.** The Notes column must show the derivation, not just the result.
+
+**Storage estimation template:**
+
+```
+writes_per_second × 86,400 s/day × 365 days × years × bytes_per_record
+```
+
+**Worked example — URL shortener, 100 writes/s, 5 years, 500 bytes/record:**
+
+```
+100 × 86,400 × 365 × 5 = 15,768,000,000 total records
+15,768,000,000 × 500 bytes = 7,884,000,000,000 bytes ≈ 7.9 TB
+```
+
+The most common error: confusing GB and TB (factor of 1,000). Always compute; never estimate.
+
+### Structured Answer — Core Engineering Challenge
+
+Every Big Tech system design answer must proactively address the **core engineering challenge** of the topic — the one thing interviewers always probe — even if the question does not explicitly ask. Raising it unprompted signals depth and separates a 7/10 answer from a 10/10.
+
+**Known core challenges per common design question:**
+
+| Design question | Core challenge to always address |
+|---|---|
+| URL shortener | Short code generation: base62 + sequential ID vs MD5-truncated; Snowflake IDs for multi-server uniqueness; collision handling |
+| Rate limiter | Algorithm choice: token bucket vs sliding window log vs sliding window counter; where state lives (Redis vs in-process); race condition on distributed decrement |
+| Chat / messaging | Message delivery guarantee: at-most-once vs at-least-once vs exactly-once; fan-out strategy for group chats; online/offline presence |
+| Search autocomplete | Trie vs inverted index; where prefix cache lives; freshness vs latency trade-off; top-K ranking |
+| Notification system | Push vs pull; fan-out-on-write vs fan-out-on-read; celebrity problem (a user with 100M followers posts) |
+| CDN | Cache invalidation: TTL vs event-driven purge; cache miss thundering herd; origin shield pattern |
+| Key-value store | Consistency model: eventual vs strong; conflict resolution (last-write-wins vs vector clocks); partition tolerance |
+
+Expand this table as new topics are implemented.
+
+### "How the Web Works" Type Questions — Four Details That Separate 10/10 Answers
+
+When any interview question involves DNS → TCP → TLS → HTTP → render, always include all four of these — they are the details most candidates miss:
+
+1. **HSTS preload list** — Before DNS, the browser checks a hardcoded list. `google.com`, `youtube.com`, etc. are on it. The browser forces HTTPS and never attempts HTTP — even on first visit. This eliminates the otherwise-inevitable HTTP → 301 round trip.
+2. **HTTP/2 stream multiplexing vs HTTP/1.1 head-of-line blocking** — Don't just say "parallel requests." Explain that HTTP/1.1 serialises requests on each TCP connection (browsers open 6–8 connections to compensate), while HTTP/2 multiplexes independent streams over one connection with zero queueing between streams.
+3. **TLS 1.3 0-RTT resumption** — Returning visitors with a valid session ticket send application data inside the ClientHello — TLS adds zero extra round trips. Mention this when discussing TTFB optimisation.
+4. **Service workers for returning users** — A registered service worker intercepts the fetch before any network contact, serving from Cache Storage API. Zero DNS, zero TCP, zero TTFB. This is why PWAs load in single-digit milliseconds on repeat visits.
 
 ---
 
@@ -343,3 +462,22 @@ When adding a new topic, assign all tags before writing any code. The tags in `T
 - Diagram strings follow Mermaid syntax and are co-located with the component that renders them (not in a separate data file).
 - Animation components receive plain data props; no animation logic inside page files.
 - All trade-off comparisons are rendered as Markdown tables, not as JSX tables, so they remain readable in source.
+
+### LLD Sub-Section Heading Names (enforced across all topics)
+
+Every `## Implementation` section must use exactly these sub-headings, in this order:
+
+| Sub-heading | Content |
+|---|---|
+| `### Schema Design` | Mongoose model + TypeScript interface + index declarations. Omit only for foundational topics with no DB model. |
+| `### API Contract` | Controller functions (one per HTTP verb) + router wiring file |
+| `### Data Flow` | Mermaid flowchart component — code-level request path |
+
+Every `## Schema` section must use exactly these sub-headings:
+
+| Sub-heading | Content |
+|---|---|
+| `### Entity Relationships` | Mermaid ER diagram component |
+| `### Request Data Flow` | Mermaid infrastructure-level flow component |
+
+Non-conforming sub-heading names ("The Mongoose Schema", "The Controller", "Entity Relationship Diagram") are wrong. Fix them when you touch a file.

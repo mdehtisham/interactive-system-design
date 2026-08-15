@@ -48,7 +48,7 @@ After this phase:
 
 ---
 
-### Section 2 — FAANG Deep-Dive
+### Section 2 — Big Tech Deep-Dive
 
 **Real systems to reference by name:**
 - **Google** — operates its own global DNS (8.8.8.8), uses anycast routing so the nearest Google server answers
@@ -273,7 +273,7 @@ flowchart LR
 
 ## Interview Prep (Section 7)
 
-### Sample FAANG Question
+### Sample Big Tech Question
 
 > "Walk me through what happens when a user types `google.com` into their browser and hits Enter."
 
@@ -318,7 +318,7 @@ flowchart LR
 Use the standard 19-item checklist from CLAUDE.md:
 
 - [ ] **ELI5 section** written, passes 10-year-old standard, uses library analogy, < 200 words, no jargon before the analogy
-- [ ] **FAANG Deep-Dive** written, references Google (DNS 8.8.8.8 anycast), Netflix (GeoDNS Route 53), Cloudflare (1.1.1.1, 300+ PoPs)
+- [ ] **Big Tech Deep-Dive** written, references Google (DNS 8.8.8.8 anycast), Netflix (GeoDNS Route 53), Cloudflare (1.1.1.1, 300+ PoPs)
 - [ ] **Prerequisites block** — "None — start here" rendered in TopicHeader
 - [ ] **Next.js implementation** working — `src/app/api/request-echo/route.ts` returns live request metadata, code block rendered with Shiki highlighting
 - [ ] **Mongoose schema** — N/A for this topic (noted in section); ER diagram shows DNS record types instead

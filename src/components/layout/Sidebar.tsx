@@ -4,10 +4,9 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useUIStore } from '@/store/uiStore'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
-import { ChevronRight, Home } from 'lucide-react'
+import { ChevronRight, Home, BookOpen } from 'lucide-react'
 import { topics } from '@/lib/topics'
 import type { Cluster } from '@/types/topic'
 import { cn } from '@/lib/utils'
@@ -28,7 +27,7 @@ interface NavProps {
 
 function SidebarNav({ pathname, onNavigate }: NavProps) {
   return (
-    <ScrollArea className="flex-1">
+    <div className="flex-1 overflow-y-auto">
       <nav className="p-2">
         {/* Home link */}
         <Link
@@ -43,6 +42,21 @@ function SidebarNav({ pathname, onNavigate }: NavProps) {
         >
           <Home className="h-4 w-4 shrink-0" />
           Home
+        </Link>
+
+        {/* Interview Guide link */}
+        <Link
+          href="/interview-guide"
+          onClick={onNavigate}
+          className={cn(
+            'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors mb-1',
+            pathname === '/interview-guide'
+              ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400'
+              : 'text-zinc-500 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800 hover:text-gray-900 dark:hover:text-zinc-100'
+          )}
+        >
+          <BookOpen className="h-4 w-4 shrink-0" />
+          Interview Framework
         </Link>
 
         <div className="my-1 border-t border-border" />
@@ -92,7 +106,7 @@ function SidebarNav({ pathname, onNavigate }: NavProps) {
           )
         })}
       </nav>
-    </ScrollArea>
+    </div>
   )
 }
 

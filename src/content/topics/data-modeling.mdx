@@ -1,0 +1,234 @@
+---
+title: Data Modeling for Applications
+description: Design PostgreSQL schemas that scale — entity relationships, normalization trade-offs, and the patterns Big Tech engineers reach for first.
+order: 6
+cluster: storage
+difficulty: medium
+interviewFrequency: high
+prerequisites:
+  - databases-101
+  - apis-and-rest
+---
+
+## ELI5 Foundation
+
+Imagine you're building a school. Before you start laying bricks, you need a blueprint — where do the classrooms go, how do hallways connect them, where are the exits? If you start without a blueprint, rooms end up in the wrong places, and fixing them after the walls are up is extremely expensive.
+
+**Data modeling** is that blueprint for your database. Before you write a single line of application code, you decide: what information needs to be stored, how the pieces relate to each other, and which way of organizing it will make your app fast and correct.
+
+A **schema** is the blueprint itself — the tables, the columns, and the rules (like "every post must belong to a user"). When you model data well, your queries are fast, your code is simple, and adding new features is straightforward. When you model it badly, every new feature requires painful database migrations and your queries get slower over time.
+
+The art of data modeling is making these decisions in the right order, before the walls go up.
+
+---
+
+## Big Tech Deep-Dive
+
+### Why Data Modeling Is a First-Class Engineering Skill
+
+At companies like Google, Meta, and Stripe, the schema review is often more scrutinized than the code review. A bad index or a wrong relationship type in a schema deployed to hundreds of millions of rows is a multi-day incident — you cannot `ALTER TABLE` a 500-million-row table in production without taking the service down, and rewriting the migration takes a full sprint.
+
+Senior engineers at these companies think in data shapes first: what are the entities, what are the relationships, what are the write patterns, what are the read patterns, and what consistency guarantees are needed? The application code follows from the data model — not the other way around.
+
+**The five decisions that define every data model:**
+
+1. **What are the entities?** Every distinct thing in your system that needs to be stored independently. Users, posts, orders, payments — each becomes a table.
+
+2. **What are the relationships?** One-to-many (a user has many posts), many-to-many (a user can like many posts; a post can be liked by many users), or self-referencing (a task can have sub-tasks).
+
+3. **Where does the data live — embed or reference?** In relational databases: always reference (foreign keys) unless the embedded data is small, bounded, and always fetched together. In document databases: embedding avoids joins but duplicates data.
+
+4. **What are the access patterns?** An index only helps the queries it was designed for. A table without the right index on a 10-million-row dataset is a full-table scan on every request. At Big Tech, indexes are designed alongside the schema — never as an afterthought.
+
+5. **What consistency do you need?** Financial transactions need ACID guarantees — PostgreSQL. Activity feeds and view counts tolerate eventual consistency — Redis, Cassandra, or DynamoDB. Picking the wrong database for the consistency requirement is the most expensive schema mistake.
+
+### PostgreSQL as the Default Starting Point
+
+PostgreSQL is the right default for most application data modeling because it combines:
+
+- **ACID transactions** — multi-row writes either all succeed or all fail
+- **Strong typing** — dates, UUIDs, JSONB, arrays, ranges; catches data quality bugs at the DB layer
+- **Relational integrity** — foreign keys, unique constraints, CHECK constraints; the DB enforces your business rules even when application code has bugs
+- **JSONB** — flexible schema for attributes that vary (product variants, user preferences) with full GIN indexing
+- **Extension ecosystem** — PostGIS for geospatial, pg_trgm for fuzzy text search, ltree for tree hierarchies, btree_gist for range exclusion constraints
+
+When you hit PostgreSQL's limits (millions of writes per second, global multi-region writes, pure key-value access patterns), you move specific workloads to purpose-built stores — but you keep PostgreSQL for the relational core.
+
+**MongoDB comparison:** MongoDB's document model is excellent when your data is naturally hierarchical and attributes vary widely per document (product catalogs, CMS content). The trade-off: no joins, no multi-document ACID transactions (before v4.0, and they remain expensive), and no CHECK constraints. The schemas in this topic use PostgreSQL as the primary store, with MongoDB notes where the document model offers a meaningful alternative.
+
+---
+
+## 10 Interview Scenarios — Expand Each to See the Full Schema
+
+These are the ten data modeling questions most commonly asked in Big Tech system design interviews. Each scenario includes the entity relationship diagram, the full PostgreSQL schema, design decision rationale, query patterns, and the exact mistake that eliminates most candidates.
+
+Think through your answer before expanding each scenario.
+
+<DataModelingAccordion />
+
+---
+
+## Implementation
+
+### Schema Design
+
+The scenarios above contain the complete schemas. The patterns shared across all of them:
+
+**Always use `BIGSERIAL` (not `INT`) for primary keys.** At 2 billion rows, an INT PK overflows — a production incident. BIGSERIAL gives you 9.2 × 10¹⁸ rows before overflow. The storage cost is 4 bytes extra per row — negligible.
+
+**Store monetary values as `INT` cents, never `DECIMAL` or `FLOAT`.** Floating-point arithmetic accumulates rounding errors: `0.1 + 0.2 = 0.30000000000000004` in IEEE 754. Storing 1099 instead of 10.99 eliminates precision bugs entirely. Divide by 100 at the presentation layer only.
+
+**Use `TIMESTAMPTZ` (timestamp with time zone), never `TIMESTAMP`.** TIMESTAMP stores a local time with no timezone information — ambiguous at daylight saving boundaries and useless for any user in a different timezone. TIMESTAMPTZ stores UTC internally and converts at display time.
+
+**Composite primary keys replace surrogate keys on junction tables.** The `follows` table with `PRIMARY KEY (follower_id, followee_id)` is both the uniqueness constraint and the index — no separate `id` column needed. Simpler schema, faster lookups.
+
+### API Contract
+
+A typical data modeling API layer follows this pattern for any entity:
+
+```typescript
+// GET /api/v1/users/:id — read a user by primary key
+export async function getUser(req: Request, res: Response) {
+  const { id } = req.params
+  const result = await db.query(
+    'SELECT id, username, email, created_at FROM users WHERE id = $1',
+    [id]
+  )
+  if (!result.rows[0]) return res.status(404).json({ error: 'User not found' })
+  return res.json(result.rows[0])
+}
+
+// POST /api/v1/users — create a user
+export async function createUser(req: Request, res: Response) {
+  const { username, email } = req.body
+  try {
+    const result = await db.query(
+      'INSERT INTO users (username, email) VALUES ($1, $2) RETURNING *',
+      [username, email]
+    )
+    return res.status(201).json(result.rows[0])
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === '23505') {
+      return res.status(409).json({ error: 'Username or email already taken' })
+    }
+    throw err
+  }
+}
+```
+
+Error code `23505` is PostgreSQL's unique-violation code — catching it at the controller layer returns a clean 409 instead of a 500.
+
+### Data Flow
+
+Request flow for `POST /api/v1/users`:
+
+```
+Client
+  → POST /api/v1/users (JSON body)
+  → Express router
+  → Input validation middleware (Zod)
+  → createUser controller
+  → db.query (parameterized — SQL injection safe)
+  → PostgreSQL (unique constraint check)
+  → RETURNING * (new row)
+  → 201 Created (user object)
+```
+
+---
+
+## Schema
+
+### Entity Relationships
+
+The ten scenarios above each include their own entity relationship diagram rendered inline. The common structural patterns:
+
+- **Junction tables** (follows, likes, order_items) resolve many-to-many relationships — never store arrays of IDs in a column
+- **Self-referencing foreign keys** (tasks.parent_task_id) model tree hierarchies
+- **Polymorphic associations** (entity_type + entity_id columns) link to different tables from a single row — used in notifications
+
+### Request Data Flow
+
+For a schema-heavy write (booking a hotel room with overlap prevention):
+
+```
+Client
+  → POST /api/v1/reservations
+  → Controller validates check_in < check_out
+  → BEGIN transaction
+  → INSERT INTO reservations (triggers EXCLUDE USING GIST constraint)
+  → DB rejects with error if dates overlap an existing booking
+  → COMMIT or ROLLBACK
+  → 201 Created or 409 Conflict
+```
+
+The EXCLUDE constraint runs inside the transaction — no race condition is possible between the check and the write.
+
+---
+
+## Trade-offs
+
+| Decision | Choose when | Avoid when |
+|---|---|---|
+| Separate junction table | Many-to-many relationship can grow unbounded | Relationship is always small and bounded (embed instead) |
+| JSONB for attributes | Attributes vary by entity type, evolve frequently | Attributes are fixed and well-known — use columns |
+| Denormalized counter | Read is 100× more frequent than write | Write frequency is very high (use COUNT at read time or a stream processor) |
+| EXCLUDE USING GIST | Need to prevent date/range overlaps atomically | Database doesn't support GiST (use optimistic locking instead) |
+| Self-referencing FK | Hierarchical data with arbitrary depth | Depth is always fixed (e.g. exactly 2 levels — use a parent_id column) |
+| Append-only ledger | Financial data, audit trail required | Storage cost is a hard constraint and history is not needed |
+| Table partitioning | Time-series data, query by date range, cold data archival | Table is small — partitioning adds overhead with no benefit |
+
+---
+
+## Common Mistakes
+
+- **Storing arrays of IDs in a column** (`follower_ids TEXT[]` on the users row). Arrays have no index beyond `@>` containment, they can't be joined, and they blow up at scale. Always use a junction table for unbounded many-to-many relationships.
+
+- **Checking for uniqueness in application code before inserting.** Between the SELECT check and the INSERT, a concurrent request can create the same record. Only a UNIQUE constraint or an EXCLUDE constraint enforces uniqueness atomically. Error code 23505 is your safety net — always catch it.
+
+- **Using `FLOAT` or `DECIMAL` for money.** Store cents as INT. The only place a decimal point appears is in the UI layer.
+
+- **Designing the schema around the ORM's defaults.** ORMs generate `id INT AUTO_INCREMENT` by default. This is wrong for large-scale systems. Use `BIGSERIAL`, `UUID`, or a distributed ID generator (Snowflake-style) depending on your write scale.
+
+- **No index on foreign key columns.** PostgreSQL does NOT automatically create an index on a foreign key column. A `REFERENCES users(id)` on the `posts.user_id` column does not index `user_id`. The query `SELECT * FROM posts WHERE user_id = $1` will do a full table scan without `CREATE INDEX posts_user_id ON posts (user_id)`.
+
+---
+
+## Interview Prep
+
+### Back-of-the-Envelope: Social Media Schema at Scale
+
+**Assumptions:** 100 million users, 1 million new posts/day, 10 million likes/day, 50 million follows total.
+
+| Table | Rows (5 years) | Row size | Storage |
+|---|---|---|---|
+| users | 100M | ~200 bytes | ~20 GB |
+| posts | 1M/day × 365 × 5 = 1.825B | ~300 bytes | ~547 GB |
+| likes | 10M/day × 365 × 5 = 18.25B | ~24 bytes | ~438 GB |
+| follows | 50M (relatively static) | ~16 bytes | ~800 MB |
+
+**Key insight:** The `likes` table is your largest table by row count, but smallest by row size (just two FK columns + timestamp). At 18 billion rows, you need table partitioning by `liked_at` date range — querying the last 30 days' likes for a post should hit one partition, not the full table.
+
+### Structured Answer Template
+
+When asked "Design the database schema for X" in an interview:
+
+1. **Identify the entities** — list 3-5 core nouns in the system
+2. **Draw the relationships** — one-to-many or many-to-many? Self-referencing?
+3. **Name the access patterns** — what queries will run most frequently?
+4. **Declare the indexes** — for every frequent WHERE clause, there's an index
+5. **State the consistency requirement** — does this need ACID? Or is eventual consistency acceptable?
+6. **Call out the core engineering challenge** — for most schemas, it's the relationship that can grow unbounded (the fan-out problem)
+
+### Sample Question
+
+**"Design the data model for a notification system that supports multiple delivery channels."**
+
+**10/10 answer structure:**
+
+- Start with entities: `notifications` (the content), `notification_deliveries` (the per-channel delivery record)
+- Relationships: one notification can be delivered via in-app, email, push — three rows in `notification_deliveries`
+- Access patterns: "unread notifications for user" is the hot read — partial index `WHERE NOT is_read`
+- Core engineering challenge: fan-out for high-follower accounts. When a user with 50M followers posts, creating 50M notification rows synchronously blocks the write for minutes. Solution: fan-out-on-read for celebrity accounts (query follows table at render time), fan-out-on-write for normal users (pre-compute at post time)
+- Back-of-the-envelope: 50M followers × 50 bytes/notification = 2.5 GB per celebrity post. At write time, that's 50M INSERTs — 10-50 seconds at 1M inserts/second. Must be async via a queue (Kafka, SQS)
+
+Think through your answer before revealing it.
