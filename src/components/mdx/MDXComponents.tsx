@@ -57,6 +57,8 @@ import { RlApiFlowDiagram } from '@/components/diagrams/RlApiFlowDiagram'
 import { HowTheWebWorksQA } from '@/components/interview/topics/HowTheWebWorksQA'
 import { ApisAndRestQA } from '@/components/interview/topics/ApisAndRestQA'
 import { CdnQA } from '@/components/interview/topics/CdnQA'
+// Topic 06: Data Modeling — accordion
+import { DataModelingAccordion } from '@/components/interview/topics/DataModelingAccordion'
 
 /**
  * Converts any string to a URL-safe anchor ID.
@@ -272,4 +274,7 @@ export const mdxComponents: MDXComponents = {
   NetworkingFundamentalsQA,
   ApisAndRestQA,
   CdnQA,
+
+  // ── Topic 06: Data Modeling ───────────────────────────────────────────────
+  DataModelingAccordion,
 }
