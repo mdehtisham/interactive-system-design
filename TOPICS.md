@@ -1,6 +1,6 @@
 # TOPICS.md
 
-Topic registry for the interactive system design platform. Covers the MVP set (15 topics) and the post-MVP backlog. Every topic follows the 7-step methodology defined in CLAUDE.md.
+Topic registry for the interactive system design platform. Covers the MVP set (16 topics) and the post-MVP backlog. Every topic follows the 7-step methodology defined in CLAUDE.md.
 
 ---
 
@@ -27,7 +27,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-## MVP Topics (15)
+## MVP Topics (16)
 
 ### Cluster 1 — Web Foundations
 
@@ -142,7 +142,26 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 6. Database Indexing
+#### 6. Data Modeling for Applications
+
+| Field | Value |
+|---|---|
+| Slug | `data-modeling` |
+| Cluster | `storage` |
+| Difficulty | `medium` |
+| Interview Frequency | `high` |
+| Path | `fundamentals-first` `interview-critical` `complexity-ladder` |
+| HLD Weight | `supporting` |
+| Status | `mvp` |
+| Prerequisites | `databases-101` `apis-and-rest` |
+
+**Covers:** Relational data modeling with PostgreSQL — entity-relationship design, normalisation vs denormalisation trade-offs, foreign key constraints, junction tables, composite primary keys, JSONB for flexible attributes, date-range exclusion constraints. MongoDB comparison for document-oriented scenarios. Ten interview-style design scenarios (social media, e-commerce, chat, ride-sharing, URL shortener, booking platform, notification system, task management, payments, video streaming) each with a full ER diagram, PostgreSQL schema, key design decisions, and Big Tech differentiator.
+
+**LLD angle:** PostgreSQL schemas via `node-postgres` (`pg`) in an Express route. Shows parameterised queries and connection pooling. MongoDB comparison notes where the document model offers a meaningful alternative.
+
+---
+
+#### 7. Database Indexing
 
 | Field | Value |
 |---|---|
@@ -161,7 +180,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 7. Replication Strategies
+#### 8. Replication Strategies
 
 | Field | Value |
 |---|---|
@@ -180,7 +199,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 8. CAP Theorem
+#### 9. CAP Theorem
 
 | Field | Value |
 |---|---|
@@ -199,7 +218,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 9. Database Sharding
+#### 10. Database Sharding
 
 | Field | Value |
 |---|---|
@@ -216,7 +235,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 **LLD angle:** MongoDB sharded cluster configuration. Mermaid diagram showing a sharded cluster with config servers and mongos router. ER diagram showing how a sharded collection is partitioned across shards.
 
-> **Note:** `scalability` (Cluster 3, Topic 10) is a prerequisite — this topic appears in Cluster 2 but cannot be unlocked until Cluster 3 Topic 10 is completed. Treat as the capstone of the storage cluster.
+> **Note:** `scalability` (Cluster 3, Topic 11) is a prerequisite — this topic appears in Cluster 2 but cannot be unlocked until Cluster 3 Topic 11 is completed. Treat as the capstone of the storage cluster.
 
 ---
 
@@ -226,7 +245,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 10. Scalability
+#### 11. Scalability
 
 | Field | Value |
 |---|---|
@@ -245,7 +264,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 11. Load Balancing
+#### 12. Load Balancing
 
 | Field | Value |
 |---|---|
@@ -266,7 +285,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 12. Caching
+#### 13. Caching
 
 | Field | Value |
 |---|---|
@@ -291,7 +310,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 13. Message Queues
+#### 14. Message Queues
 
 | Field | Value |
 |---|---|
@@ -310,7 +329,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 14. Rate Limiting & API Gateways
+#### 15. Rate Limiting & API Gateways
 
 | Field | Value |
 |---|---|
@@ -329,7 +348,7 @@ Each topic carries internal tags that power learning paths without restructuring
 
 ---
 
-#### 15. Resilience Patterns
+#### 16. Resilience Patterns
 
 | Field | Value |
 |---|---|
@@ -365,7 +384,7 @@ Topics to be added progressively after the MVP ships. All follow the same 7-step
 
 | Topic | Difficulty | Interview Frequency |
 |---|---|---|
-| Data Modeling Patterns (embedding vs referencing, denormalization) | medium | high |
+| Advanced Data Modeling Patterns (polymorphic associations, event sourcing, CQRS) | hard | medium |
 | Time-Series Databases | hard | medium |
 | Search Engines & Inverted Index (Elasticsearch) | hard | high |
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+// No React hooks used directly — state is managed by the Interactive base component
 import { motion, AnimatePresence } from 'framer-motion'
 import { Interactive } from '../Interactive'
 import type { ControlValues, ControlDef } from '../Interactive'

@@ -63,6 +63,18 @@ export const topics: Topic[] = [
   },
   {
     order: 6,
+    slug: 'data-modeling',
+    title: 'Data Modeling for Applications',
+    cluster: 'storage',
+    difficulty: 'medium',
+    interviewFrequency: 'high',
+    path: ['fundamentals-first', 'interview-critical', 'complexity-ladder'],
+    hldWeight: 'supporting',
+    status: 'mvp',
+    prerequisites: ['databases-101', 'apis-and-rest'],
+  },
+  {
+    order: 7,
     slug: 'database-indexing',
     title: 'Database Indexing',
     cluster: 'storage',
@@ -74,7 +86,7 @@ export const topics: Topic[] = [
     prerequisites: ['databases-101'],
   },
   {
-    order: 7,
+    order: 8,
     slug: 'replication-strategies',
     title: 'Replication Strategies',
     cluster: 'storage',
@@ -86,7 +98,7 @@ export const topics: Topic[] = [
     prerequisites: ['databases-101'],
   },
   {
-    order: 8,
+    order: 9,
     slug: 'cap-theorem',
     title: 'CAP Theorem',
     cluster: 'storage',
@@ -98,7 +110,7 @@ export const topics: Topic[] = [
     prerequisites: ['databases-101', 'replication-strategies'],
   },
   {
-    order: 9,
+    order: 10,
     slug: 'database-sharding',
     title: 'Database Sharding',
     cluster: 'storage',
@@ -110,7 +122,7 @@ export const topics: Topic[] = [
     prerequisites: ['database-indexing', 'cap-theorem', 'scalability'],
   },
   {
-    order: 10,
+    order: 11,
     slug: 'scalability',
     title: 'Scalability',
     cluster: 'scale',
@@ -122,7 +134,7 @@ export const topics: Topic[] = [
     prerequisites: ['databases-101', 'apis-and-rest'],
   },
   {
-    order: 11,
+    order: 12,
     slug: 'load-balancing',
     title: 'Load Balancing',
     cluster: 'scale',
@@ -134,7 +146,7 @@ export const topics: Topic[] = [
     prerequisites: ['scalability'],
   },
   {
-    order: 12,
+    order: 13,
     slug: 'caching',
     title: 'Caching',
     cluster: 'scale',
@@ -146,7 +158,7 @@ export const topics: Topic[] = [
     prerequisites: ['scalability', 'databases-101'],
   },
   {
-    order: 13,
+    order: 14,
     slug: 'message-queues',
     title: 'Message Queues',
     cluster: 'reliability',
@@ -158,7 +170,7 @@ export const topics: Topic[] = [
     prerequisites: ['scalability', 'databases-101'],
   },
   {
-    order: 14,
+    order: 15,
     slug: 'rate-limiting-api-gateways',
     title: 'Rate Limiting & API Gateways',
     cluster: 'reliability',
@@ -170,7 +182,7 @@ export const topics: Topic[] = [
     prerequisites: ['apis-and-rest', 'load-balancing'],
   },
   {
-    order: 15,
+    order: 16,
     slug: 'resilience-patterns',
     title: 'Resilience Patterns',
     cluster: 'reliability',
